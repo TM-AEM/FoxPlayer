@@ -15,6 +15,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.example.core.model.PlaybackState
 import com.example.core.model.PlaybackStatus
 import com.example.core.model.VideoItem
+import com.example.data.local.database.FoxPlayerDatabase
+import com.example.data.local.database.dao.HistoryDao
+import com.example.data.local.database.entity.PlaybackHistoryEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +31,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 /**
  * Production implementation of [PlayerEngine] backed by AndroidX Media3 [ExoPlayer].
@@ -36,11 +41,19 @@ import kotlinx.coroutines.launch
 class FoxPlayerEngine(
     context: Context,
     val exoPlayer: ExoPlayer = buildExoPlayer(context),
-    mainDispatcher: CoroutineDispatcher = Dispatchers.Main
+    private val historyDao: HistoryDao? = try { FoxPlayerDatabase.getInstance(context).historyDao() } catch (_: Throwable) { null },
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : PlayerEngine {
 
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
     private var progressJob: Job? = null
+
+    // Track active video item and history throttle state
+    private var currentVideoItem: VideoItem? = null
+    private var lastPersistedPositionMs: Long = -1L
+    private var lastPersistedTimeMs: Long = 0L
+    private var lastPersistedUri: String? = null
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
@@ -71,6 +84,20 @@ class FoxPlayerEngine(
                     startProgressUpdates()
                 } else {
                     stopProgressUpdates()
+                    // Paused or stopped playing: save position once if changed by at least 1 second
+                    val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+                    val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    if (abs(pos - lastPersistedPositionMs) >= 1000L) {
+                        saveHistory(pos, dur, isEnded = player.playbackState == Player.STATE_ENDED)
+                    }
+                }
+            }
+
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)) {
+                if (player.playbackState == Player.STATE_ENDED) {
+                    val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+                    val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    saveHistory(pos, dur, isEnded = true)
                 }
             }
         }
@@ -92,14 +119,55 @@ class FoxPlayerEngine(
         updateState()
     }
 
+    /**
+     * Calculates whether playback should resume from [lastPositionMs] and returns the resume position.
+     * Returns 0L if position is near start, near end, or invalid.
+     */
+    fun calculateResumePosition(lastPositionMs: Long, durationMs: Long): Long {
+        if (lastPositionMs < 3000L) {
+            // Watched less than 3 seconds: start from beginning
+            return 0L
+        }
+        if (durationMs in 1L..15000L) {
+            // Very short video (<= 15 seconds): don't resume if within 3 seconds of end or >= 80% watched
+            if (lastPositionMs >= durationMs - 3000L || lastPositionMs >= (durationMs * 0.8f)) {
+                return 0L
+            }
+        } else if (durationMs > 15000L) {
+            // Standard video: don't resume if within 5 seconds of end or >= 95% watched
+            if (lastPositionMs >= durationMs - 5000L || lastPositionMs >= (durationMs * 0.95f)) {
+                return 0L
+            }
+        }
+        return lastPositionMs
+    }
+
     override fun prepare(uri: Uri, playWhenReady: Boolean) {
+        val uriString = uri.toString()
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.playWhenReady = playWhenReady
         exoPlayer.prepare()
+
+        // Asynchronously check history to resume position without blocking UI
+        scope.launch(ioDispatcher) {
+            val history = historyDao?.getHistoryByUriDirect(uriString)
+            if (history != null) {
+                val resumePos = calculateResumePosition(history.lastPositionMs, history.durationMs)
+                if (resumePos > 0L) {
+                    withContext(mainDispatcher) {
+                        if (exoPlayer.currentMediaItem?.localConfiguration?.uri == uri) {
+                            exoPlayer.seekTo(resumePos)
+                            updateState()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun prepare(videoItem: VideoItem, playWhenReady: Boolean) {
+        currentVideoItem = videoItem
         val mediaMetadata = MediaMetadata.Builder()
             .setTitle(videoItem.title.ifBlank { videoItem.displayName })
             .setDisplayTitle(videoItem.title.ifBlank { videoItem.displayName })
@@ -114,6 +182,25 @@ class FoxPlayerEngine(
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.playWhenReady = playWhenReady
         exoPlayer.prepare()
+
+        // Asynchronously check history to resume position without blocking UI
+        scope.launch(ioDispatcher) {
+            val history = historyDao?.getHistoryByUriDirect(videoItem.uri)
+            if (history != null) {
+                val resumePos = calculateResumePosition(
+                    history.lastPositionMs,
+                    history.durationMs.takeIf { it > 0 } ?: videoItem.durationMs
+                )
+                if (resumePos > 0L) {
+                    withContext(mainDispatcher) {
+                        if (currentVideoItem?.uri == videoItem.uri) {
+                            exoPlayer.seekTo(resumePos)
+                            updateState()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun play() {
@@ -167,16 +254,65 @@ class FoxPlayerEngine(
     }
 
     override fun stop() {
+        val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+        val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+        if (abs(pos - lastPersistedPositionMs) >= 1000L) {
+            saveHistory(pos, dur, isEnded = exoPlayer.playbackState == Player.STATE_ENDED)
+        }
         exoPlayer.stop()
         stopProgressUpdates()
         updateState()
     }
 
     override fun release() {
+        val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+        val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+        if (abs(pos - lastPersistedPositionMs) >= 1000L) {
+            saveHistory(pos, dur, isEnded = exoPlayer.playbackState == Player.STATE_ENDED)
+        }
         stopProgressUpdates()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()
         scope.cancel()
+    }
+
+    private fun saveHistory(positionMs: Long, durationMs: Long, isEnded: Boolean) {
+        val currentItem = currentVideoItem
+        val uri = currentItem?.uri
+            ?: exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
+            ?: return
+        val title = currentItem?.title?.ifBlank { currentItem.displayName }
+            ?: exoPlayer.currentMediaItem?.mediaMetadata?.title?.toString()
+            ?: "Video"
+
+        val safeDuration = if (durationMs > 0) durationMs else (currentItem?.durationMs ?: 0L)
+        val percentage = if (isEnded) {
+            1.0f
+        } else if (safeDuration > 0) {
+            (positionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+        lastPersistedPositionMs = positionMs
+        lastPersistedTimeMs = System.currentTimeMillis()
+        lastPersistedUri = uri
+
+        scope.launch(ioDispatcher) {
+            try {
+                val entity = PlaybackHistoryEntity(
+                    videoUri = uri,
+                    title = title,
+                    durationMs = safeDuration,
+                    lastPositionMs = positionMs,
+                    lastPlayedTimestamp = System.currentTimeMillis(),
+                    watchPercentage = percentage
+                )
+                historyDao?.upsertHistory(entity)
+            } catch (_: Throwable) {
+                // Safe database handling
+            }
+        }
     }
 
     private fun updateState() {
@@ -219,6 +355,13 @@ class FoxPlayerEngine(
                         bufferedPositionMs = buffered
                     )
                 }
+
+                // Throttled history save: at most once every 5 seconds during active playback
+                val now = System.currentTimeMillis()
+                if (now - lastPersistedTimeMs >= 5000L && abs(pos - lastPersistedPositionMs) >= 3000L) {
+                    saveHistory(pos, dur, isEnded = false)
+                }
+
                 delay(250L)
             }
         }

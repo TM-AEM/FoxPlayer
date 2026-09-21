@@ -40,6 +40,7 @@ class PlayerHudTest {
 
         composeTestRule.onNodeWithTag("player_hud_overlay").assertIsDisplayed()
         composeTestRule.onNodeWithTag("player_hud_back_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("player_hud_settings_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("player_hud_title").assertIsDisplayed()
         composeTestRule.onNodeWithText("Nature Documentary").assertIsDisplayed()
         composeTestRule.onNodeWithTag("player_hud_play_pause_button").assertIsDisplayed()

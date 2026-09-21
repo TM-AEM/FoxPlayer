@@ -113,6 +113,8 @@ class PlaybackService : MediaSessionService() {
                     .add(Player.COMMAND_GET_TIMELINE)
                     .add(Player.COMMAND_SET_VOLUME)
                     .add(Player.COMMAND_GET_VOLUME)
+                    .add(Player.COMMAND_GET_TRACKS)
+                    .add(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS)
                     .build()
 
                 return MediaSession.ConnectionResult.AcceptedResultBuilder(session)

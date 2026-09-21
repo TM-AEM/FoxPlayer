@@ -18,7 +18,8 @@ import kotlin.math.roundToInt
  */
 class PlayerGestureController(
     private val context: Context,
-    private val activity: Activity?
+    private val activity: Activity?,
+    private val playerProvider: () -> androidx.media3.common.Player? = { null }
 ) {
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
@@ -30,15 +31,30 @@ class PlayerGestureController(
 
     val currentVolumePercent: Int
         get() {
+            val player = playerProvider()
+            if (player != null) {
+                return (player.volume * 100f).roundToInt().coerceIn(0, 100)
+            }
             val max = maxVolume
             if (max <= 0) return 0
             return ((currentVolume.toFloat() / max.toFloat()) * 100f).roundToInt().coerceIn(0, 100)
         }
 
     /**
-     * Adjusts stream volume by a delta step and returns the updated percentage (0..100).
+     * Adjusts player volume via Media3 Player interface [androidx.media3.common.Player.setVolume]
+     * (which is routed through MediaController -> MediaSession -> PlaybackService -> Player),
+     * and falls back to system audio stream if no player instance is connected.
+     * Returns the updated percentage (0..100).
      */
     fun adjustVolume(deltaFraction: Float): Int {
+        val player = playerProvider()
+        if (player != null) {
+            val current = player.volume
+            val target = (current + deltaFraction).coerceIn(0.0f, 1.0f)
+            player.volume = target
+            return (target * 100f).roundToInt().coerceIn(0, 100)
+        }
+
         val am = audioManager ?: return 0
         val max = maxVolume
         if (max <= 0) return 0

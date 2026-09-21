@@ -1,6 +1,8 @@
 package com.example
 
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,17 +32,40 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.core.playback.PlaybackService
 import com.example.ui.library.VideoLibraryScreen
+import com.example.ui.player.PipHelper
 import com.example.ui.player.PlayerScreen
 import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      window.attributes.layoutInDisplayCutoutMode =
+        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+    }
     setContent {
       MyApplicationTheme {
         FoxPlayerHome()
       }
+    }
+  }
+
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    // If a video is currently actively playing, seamlessly transition into PiP mode
+    val engine = PlaybackService.currentEngine
+    val isPlaying = engine?.player?.isPlaying ?: false
+    if (isPlaying && PipHelper.isPipSupported(this)) {
+      val videoSize = engine?.player?.videoSize
+      val aspect = if (videoSize != null && videoSize.width > 0 && videoSize.height > 0) {
+        val pixelRatio = if (videoSize.pixelWidthHeightRatio > 0f) videoSize.pixelWidthHeightRatio else 1.0f
+        (videoSize.width.toFloat() * pixelRatio) / videoSize.height.toFloat()
+      } else {
+        16f / 9f
+      }
+      PipHelper.enterPip(this, aspect)
     }
   }
 }

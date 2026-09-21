@@ -9,17 +9,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +72,8 @@ fun PlayerHud(
     onSeek: (Long) -> Unit,
     onBack: () -> Unit,
     onUserInteraction: () -> Unit,
+    onSettingsClick: () -> Unit = {},
+    onPipClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // Local scrubbing state so slider moves smoothly during drag without jumpy external updates
@@ -95,7 +102,7 @@ fun PlayerHud(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
+                    .height(120.dp)
                     .align(Alignment.TopCenter)
                     .background(
                         Brush.verticalGradient(
@@ -112,6 +119,8 @@ fun PlayerHud(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .displayCutoutPadding()
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -142,9 +151,39 @@ fun PlayerHud(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 16.dp)
+                        .padding(end = 8.dp)
                         .testTag("player_hud_title")
                 )
+
+                if (onPipClick != null) {
+                    IconButton(
+                        onClick = {
+                            onUserInteraction()
+                            onPipClick()
+                        },
+                        modifier = Modifier.testTag("player_hud_pip_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureInPictureAlt,
+                            contentDescription = "Picture in Picture",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = {
+                        onUserInteraction()
+                        onSettingsClick()
+                    },
+                    modifier = Modifier.testTag("player_hud_settings_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Playback settings",
+                        tint = Color.White
+                    )
+                }
             }
 
             // Center Control: Play / Pause Button
@@ -181,7 +220,7 @@ fun PlayerHud(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp)
+                    .height(136.dp)
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
@@ -198,6 +237,8 @@ fun PlayerHud(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .displayCutoutPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .testTag("player_hud_bottom_bar")
             ) {

@@ -98,4 +98,29 @@ class PlayerGestureTest {
         composeTestRule.onNodeWithTag("feedback_volume_indicator").assertDoesNotExist()
         composeTestRule.onNodeWithTag("feedback_brightness_indicator").assertDoesNotExist()
     }
+
+    @Test
+    fun testPlayerGestureControllerMediaVolumeRouting() {
+        val controllerService = org.robolectric.Robolectric.buildService(com.example.core.playback.PlaybackService::class.java)
+        val service = controllerService.create().get()
+
+        val player = com.example.core.playback.PlaybackService.currentEngine?.player
+        org.junit.Assert.assertNotNull(player)
+
+        player?.volume = 0.5f
+
+        val controller = com.example.ui.player.PlayerGestureController(
+            context = service,
+            activity = null,
+            playerProvider = { player }
+        )
+
+        org.junit.Assert.assertEquals(50, controller.currentVolumePercent)
+
+        val updatedPercent = controller.adjustVolume(0.2f)
+        org.junit.Assert.assertEquals(70, updatedPercent)
+        org.junit.Assert.assertEquals(0.7f, player?.volume ?: 0f, 0.01f)
+
+        controllerService.destroy()
+    }
 }

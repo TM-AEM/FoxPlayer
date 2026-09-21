@@ -36,6 +36,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -225,6 +226,7 @@ fun VideoLibraryScreen(
                 else -> {
                     VideoListView(
                         videos = uiState.videos,
+                        historyMap = uiState.historyMap,
                         onVideoClick = onVideoClick
                     )
                 }
@@ -239,6 +241,7 @@ fun VideoLibraryScreen(
 @Composable
 private fun VideoListView(
     videos: List<VideoItem>,
+    historyMap: Map<String, com.example.data.local.database.entity.PlaybackHistoryEntity>,
     onVideoClick: (VideoItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -253,8 +256,10 @@ private fun VideoListView(
             items = videos,
             key = { video -> video.id }
         ) { video ->
+            val history = historyMap[video.uri]
             VideoCardItem(
                 video = video,
+                history = history,
                 onClick = { onVideoClick(video) }
             )
         }
@@ -262,11 +267,12 @@ private fun VideoListView(
 }
 
 /**
- * Individual video item card showing thumbnail, duration badge, title, and metadata.
+ * Individual video item card showing thumbnail, duration badge, title, metadata, and watch progress.
  */
 @Composable
 private fun VideoCardItem(
     video: VideoItem,
+    history: com.example.data.local.database.entity.PlaybackHistoryEntity?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -281,83 +287,103 @@ private fun VideoCardItem(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Video Thumbnail with Duration Badge
-            VideoThumbnail(
-                uri = video.uri,
-                durationMs = video.durationMs,
-                contentDescription = video.title,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier = Modifier
-                    .size(width = 130.dp, height = 78.dp)
-            )
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            // Video Details (Title, Folder, Size & Date)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 2.dp)
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = video.title.ifBlank { video.displayName },
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 20.sp
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                // Video Thumbnail with Duration Badge
+                VideoThumbnail(
+                    uri = video.uri,
+                    durationMs = video.durationMs,
+                    contentDescription = video.title,
+                    modifier = Modifier
+                        .size(width = 130.dp, height = 78.dp)
                 )
 
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Video Details (Title, Folder, Size & Date)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 2.dp)
+                ) {
+                    Text(
+                        text = video.title.ifBlank { video.displayName },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 20.sp
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Folder & Resolution label
+                    val folderLabel = video.bucketName.ifBlank { "Videos" }
+                    val resolutionLabel = if (video.width > 0 && video.height > 0) {
+                        "${video.width}x${video.height}"
+                    } else null
+
+                    val subInfo = buildString {
+                        append(folderLabel)
+                        if (resolutionLabel != null) {
+                            append(" • ")
+                            append(resolutionLabel)
+                        }
+                    }
+
+                    Text(
+                        text = subInfo,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    // File size, date and resume position
+                    val metaText = buildString {
+                        append(FormatUtils.formatFileSize(video.sizeBytes))
+                        val dateFormatted = FormatUtils.formatDate(video.dateModified)
+                        if (dateFormatted.isNotBlank()) {
+                            append(" • ")
+                            append(dateFormatted)
+                        }
+                        if (history != null && history.lastPositionMs > 3000L && history.watchPercentage < 0.95f) {
+                            append(" • Resume ")
+                            append(FormatUtils.formatDuration(history.lastPositionMs))
+                        }
+                    }
+
+                    Text(
+                        text = metaText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Watch progress bar if previously played
+            if (history != null && history.watchPercentage in 0.03f..0.98f) {
+                LinearProgressIndicator(
+                    progress = { history.watchPercentage },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .padding(horizontal = 10.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // Folder & Resolution label
-                val folderLabel = video.bucketName.ifBlank { "Videos" }
-                val resolutionLabel = if (video.width > 0 && video.height > 0) {
-                    "${video.width}x${video.height}"
-                } else null
-
-                val subInfo = buildString {
-                    append(folderLabel)
-                    if (resolutionLabel != null) {
-                        append(" • ")
-                        append(resolutionLabel)
-                    }
-                }
-
-                Text(
-                    text = subInfo,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // File size and modified date
-                val metaText = buildString {
-                    append(FormatUtils.formatFileSize(video.sizeBytes))
-                    val dateFormatted = FormatUtils.formatDate(video.dateModified)
-                    if (dateFormatted.isNotBlank()) {
-                        append(" • ")
-                        append(dateFormatted)
-                    }
-                }
-
-                Text(
-                    text = metaText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }

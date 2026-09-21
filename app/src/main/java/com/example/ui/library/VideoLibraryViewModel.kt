@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.model.VideoItem
 import com.example.core.util.PermissionUtils
+import com.example.data.local.database.FoxPlayerDatabase
+import com.example.data.local.database.dao.HistoryDao
+import com.example.data.local.database.entity.PlaybackHistoryEntity
 import com.example.data.repository.MediaRepository
 import com.example.data.repository.MediaRepositoryImpl
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +38,7 @@ data class VideoLibraryUiState(
     val isPermissionGranted: Boolean = false,
     val videos: List<VideoItem> = emptyList(),
     val rawVideos: List<VideoItem> = emptyList(),
+    val historyMap: Map<String, PlaybackHistoryEntity> = emptyMap(),
     val searchQuery: String = "",
     val sortOption: VideoSortOption = VideoSortOption.DATE_DESC,
     val errorMessage: String? = null
@@ -48,7 +52,8 @@ data class VideoLibraryUiState(
  */
 class VideoLibraryViewModel @JvmOverloads constructor(
     application: Application,
-    private val mediaRepository: MediaRepository = MediaRepositoryImpl(application)
+    private val mediaRepository: MediaRepository = MediaRepositoryImpl(application),
+    private val historyDao: HistoryDao? = try { FoxPlayerDatabase.getInstance(application).historyDao() } catch (_: Throwable) { null }
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(VideoLibraryUiState())
@@ -56,6 +61,19 @@ class VideoLibraryViewModel @JvmOverloads constructor(
 
     init {
         checkPermissionAndLoad()
+        observeHistory()
+    }
+
+    private fun observeHistory() {
+        val dao = historyDao ?: return
+        viewModelScope.launch {
+            dao.getAllHistory()
+                .catch { /* safe error fallback */ }
+                .collect { historyList ->
+                    val map = historyList.associateBy { it.videoUri }
+                    _uiState.update { it.copy(historyMap = map) }
+                }
+        }
     }
 
     fun checkPermissionAndLoad() {
