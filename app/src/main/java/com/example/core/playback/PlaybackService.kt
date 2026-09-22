@@ -25,7 +25,14 @@ class PlaybackService : MediaSessionService() {
         const val ACTION_PLAY_VIDEO = "com.example.action.PLAY_VIDEO"
         const val EXTRA_VIDEO_URI = "extra_video_uri"
         const val EXTRA_VIDEO_TITLE = "extra_video_title"
+        const val EXTRA_VIDEO_DISPLAY_NAME = "extra_video_display_name"
         const val EXTRA_VIDEO_ID = "extra_video_id"
+        const val EXTRA_VIDEO_DURATION = "extra_video_duration"
+        const val EXTRA_VIDEO_SIZE = "extra_video_size"
+        const val EXTRA_REQUEST_ID = "extra_request_id"
+
+        @Volatile
+        private var lastDirectPreparedRequestId: Long = -1L
 
         @Volatile
         var currentEngine: PlayerEngine? = null
@@ -36,11 +43,16 @@ class PlaybackService : MediaSessionService() {
             internal set
 
         fun startPlayback(context: Context, videoItem: VideoItem) {
+            val requestId = System.currentTimeMillis()
             val intent = Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_PLAY_VIDEO
+                putExtra(EXTRA_REQUEST_ID, requestId)
                 putExtra(EXTRA_VIDEO_URI, videoItem.uri)
                 putExtra(EXTRA_VIDEO_TITLE, videoItem.title.ifBlank { videoItem.displayName })
+                putExtra(EXTRA_VIDEO_DISPLAY_NAME, videoItem.displayName)
                 putExtra(EXTRA_VIDEO_ID, videoItem.id)
+                putExtra(EXTRA_VIDEO_DURATION, videoItem.durationMs)
+                putExtra(EXTRA_VIDEO_SIZE, videoItem.sizeBytes)
             }
             try {
                 ContextCompat.startForegroundService(context, intent)
@@ -49,24 +61,39 @@ class PlaybackService : MediaSessionService() {
                     context.startService(intent)
                 } catch (_: Exception) {}
             }
-            currentEngine?.prepare(videoItem, playWhenReady = true)
+            val engine = currentEngine
+            if (engine != null) {
+                lastDirectPreparedRequestId = requestId
+                engine.prepare(videoItem, playWhenReady = true)
+            }
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
         if (intent?.action == ACTION_PLAY_VIDEO) {
+            val requestId = intent.getLongExtra(EXTRA_REQUEST_ID, -1L)
             val uriString = intent.getStringExtra(EXTRA_VIDEO_URI)
             val title = intent.getStringExtra(EXTRA_VIDEO_TITLE) ?: ""
+            val displayName = intent.getStringExtra(EXTRA_VIDEO_DISPLAY_NAME) ?: title
             val videoId = intent.getLongExtra(EXTRA_VIDEO_ID, -1L)
+            val durationMs = intent.getLongExtra(EXTRA_VIDEO_DURATION, 0L)
+            val sizeBytes = intent.getLongExtra(EXTRA_VIDEO_SIZE, 0L)
+
+            // Deduplication: if startPlayback already directly prepared this request on the active engine, skip re-preparing
+            val currentUri = playerEngine?.player?.currentMediaItem?.localConfiguration?.uri?.toString()
+            if (requestId != -1L && requestId == lastDirectPreparedRequestId && currentUri == uriString) {
+                return result
+            }
+
             if (!uriString.isNullOrBlank()) {
                 val videoItem = VideoItem(
                     id = videoId,
                     uri = uriString,
                     title = title,
-                    displayName = title,
-                    durationMs = 0L,
-                    sizeBytes = 0L
+                    displayName = displayName,
+                    durationMs = durationMs,
+                    sizeBytes = sizeBytes
                 )
                 playerEngine?.prepare(videoItem, playWhenReady = true)
             }

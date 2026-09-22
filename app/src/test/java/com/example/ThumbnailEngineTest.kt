@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.thumbnail.ThumbnailEngineImpl
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -42,5 +43,21 @@ class ThumbnailEngineTest {
     fun testNonExistentUriReturnsNullWithoutCrashing() = runBlocking {
         val result = thumbnailEngine.loadThumbnail("content://invalid/uri/999999")
         assertNull("Invalid URI should safely return null", result)
+    }
+
+    @Test
+    fun testConcurrentThumbnailRequestsDeduplicated() = runBlocking {
+        val uri = "content://invalid/uri/concurrent_test"
+        val deferred1 = async { thumbnailEngine.loadThumbnail(uri, 320, 180) }
+        val deferred2 = async { thumbnailEngine.loadThumbnail(uri, 320, 180) }
+        val deferred3 = async { thumbnailEngine.loadThumbnail(uri, 320, 180) }
+
+        val res1 = deferred1.await()
+        val res2 = deferred2.await()
+        val res3 = deferred3.await()
+
+        assertEquals(res1, res2)
+        assertEquals(res2, res3)
+        assertNull(res1)
     }
 }

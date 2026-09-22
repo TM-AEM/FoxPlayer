@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.Build
 import android.util.LruCache
 import android.util.Size
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,7 +62,7 @@ class ThumbnailEngineImpl(
     }
 
     private val inFlightMutex = Mutex()
-    private val inFlightKeys = mutableSetOf<String>()
+    private val inFlightRequests = mutableMapOf<String, CompletableDeferred<Bitmap?>>()
 
     override fun getCachedThumbnail(uri: String, width: Int, height: Int): Bitmap? {
         val cacheKey = buildCacheKey(uri, width, height)
@@ -73,18 +75,52 @@ class ThumbnailEngineImpl(
         // 1. Check in-memory cache first (instant)
         memoryCache.get(cacheKey)?.let { return it }
 
-        // 2. Perform IO extraction on Dispatchers.IO with in-flight deduplication
-        return withContext(Dispatchers.IO) {
-            inFlightMutex.withLock {
-                // Double-check cache after acquiring lock
-                memoryCache.get(cacheKey)?.let { return@withContext it }
-            }
+        // 2. Thread-safe in-flight deduplication
+        var isLeader = false
+        val deferred = inFlightMutex.withLock {
+            // Double-check cache after acquiring lock
+            memoryCache.get(cacheKey)?.let { return it }
 
-            val bitmap = extractThumbnailInternal(uri, width, height)
+            val existing = inFlightRequests[cacheKey]
+            if (existing != null) {
+                existing
+            } else {
+                val newDeferred = CompletableDeferred<Bitmap?>()
+                inFlightRequests[cacheKey] = newDeferred
+                isLeader = true
+                newDeferred
+            }
+        }
+
+        if (!isLeader) {
+            // Follower: await existing extraction
+            return try {
+                deferred.await()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+        // Leader: perform the extraction on Dispatchers.IO
+        return try {
+            val bitmap = withContext(Dispatchers.IO) {
+                extractThumbnailInternal(uri, width, height)
+            }
             if (bitmap != null) {
                 memoryCache.put(cacheKey, bitmap)
             }
+            deferred.complete(bitmap)
             bitmap
+        } catch (t: Throwable) {
+            deferred.complete(null)
+            if (t is CancellationException) throw t
+            null
+        } finally {
+            inFlightMutex.withLock {
+                inFlightRequests.remove(cacheKey)
+            }
         }
     }
 

@@ -152,4 +152,24 @@ class VideoLibraryViewModelTest {
         assertFalse("Should not be loading", state.isLoading)
         assertTrue("Videos list should be empty", state.videos.isEmpty())
     }
+
+    @Test
+    fun testRepeatedRefreshDeduplication() = runTest(testDispatcher) {
+        val viewModel = VideoLibraryViewModel(application, fakeRepository)
+        viewModel.onPermissionResult(true)
+        advanceUntilIdle()
+
+        assertEquals(3, viewModel.uiState.value.videos.size)
+
+        // Trigger multiple rapid refresh operations
+        viewModel.refresh()
+        viewModel.refresh()
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse("Should not be loading after refreshes complete", state.isLoading)
+        assertEquals(3, state.videos.size)
+        assertTrue("Permission should remain granted", state.isPermissionGranted)
+    }
 }

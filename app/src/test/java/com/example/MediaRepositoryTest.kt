@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.util.PermissionUtils
 import com.example.data.repository.MediaRepositoryImpl
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -127,5 +128,15 @@ class MediaRepositoryTest {
         val videos = repository.queryVideos()
         val corruptFound = videos.find { it.displayName == "corrupt.mp4" }
         assertTrue("Zero byte files must be excluded", corruptFound == null)
+    }
+
+    @Test
+    fun testGetVideosFlowLifecycle() = runBlocking {
+        val permission = PermissionUtils.getRequiredVideoPermission()
+        shadowOf(application).grantPermissions(permission)
+
+        val flow = repository.getVideosFlow()
+        val firstEmission = flow.first()
+        assertNotNull("Flow must emit initial video list", firstEmission)
     }
 }

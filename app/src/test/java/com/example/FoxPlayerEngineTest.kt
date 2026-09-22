@@ -137,4 +137,66 @@ class FoxPlayerEngineTest {
     fun testReleaseEngine() {
         engine.release()
     }
+
+    @Test
+    fun testCalculateResumePosition() {
+        // Less than 3 seconds -> start from 0
+        assertEquals(0L, engine.calculateResumePosition(1500L, 60000L))
+        assertEquals(0L, engine.calculateResumePosition(2999L, 60000L))
+
+        // Short video (<= 15 seconds)
+        // 10s video, watched 8s (>= 80%) -> 0L
+        assertEquals(0L, engine.calculateResumePosition(8500L, 10000L))
+        // 10s video, within 3 seconds of end (8s) -> 0L
+        assertEquals(0L, engine.calculateResumePosition(7500L, 10000L))
+        // 10s video, watched 4s (< 80% and > 3s of end) -> 4000L
+        assertEquals(4000L, engine.calculateResumePosition(4000L, 10000L))
+
+        // Standard video (> 15 seconds)
+        // 100s video, watched 96s (>= 95%) -> 0L
+        assertEquals(0L, engine.calculateResumePosition(96000L, 100000L))
+        // 100s video, within 5s of end (97s) -> 0L
+        assertEquals(0L, engine.calculateResumePosition(97000L, 100000L))
+        // 100s video, watched 45s -> 45000L
+        assertEquals(45000L, engine.calculateResumePosition(45000L, 100000L))
+    }
+
+    @Test
+    fun testHistoryPersistedOnRelease() {
+        val db = androidx.room.Room.inMemoryDatabaseBuilder(
+            context,
+            com.example.data.local.database.FoxPlayerDatabase::class.java
+        ).allowMainThreadQueries().build()
+        val dao = db.historyDao()
+
+        val customEngine = FoxPlayerEngine(
+            context = context,
+            historyDao = dao
+        )
+
+        val videoItem = VideoItem(
+            id = 789L,
+            uri = "content://media/external/video/media/789",
+            title = "Persistence Test Video",
+            displayName = "persist.mp4",
+            durationMs = 120_000L,
+            sizeBytes = 2048L
+        )
+
+        customEngine.prepare(videoItem, playWhenReady = false)
+        customEngine.seekTo(25_000L)
+
+        // Release engine - must flush history to Room reliably
+        customEngine.release()
+
+        val saved = kotlinx.coroutines.runBlocking {
+            dao.getHistoryByUriDirect(videoItem.uri)
+        }
+        assertNotNull(saved)
+        assertEquals("Persistence Test Video", saved?.title)
+        assertEquals(25_000L, saved?.lastPositionMs)
+        assertEquals(120_000L, saved?.durationMs)
+
+        db.close()
+    }
 }

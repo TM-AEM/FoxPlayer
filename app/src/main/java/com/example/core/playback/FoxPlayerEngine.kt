@@ -31,7 +31,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
 /**
@@ -47,7 +51,11 @@ class FoxPlayerEngine(
 ) : PlayerEngine {
 
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
+    private val historyScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val historyMutex = Mutex()
     private var progressJob: Job? = null
+    private var resumeJob: Job? = null
+    private var lastSaveJob: Job? = null
 
     // Track active video item and history throttle state
     private var currentVideoItem: VideoItem? = null
@@ -150,7 +158,8 @@ class FoxPlayerEngine(
         exoPlayer.prepare()
 
         // Asynchronously check history to resume position without blocking UI
-        scope.launch(ioDispatcher) {
+        resumeJob?.cancel()
+        resumeJob = scope.launch(ioDispatcher) {
             val history = historyDao?.getHistoryByUriDirect(uriString)
             if (history != null) {
                 val resumePos = calculateResumePosition(history.lastPositionMs, history.durationMs)
@@ -184,7 +193,8 @@ class FoxPlayerEngine(
         exoPlayer.prepare()
 
         // Asynchronously check history to resume position without blocking UI
-        scope.launch(ioDispatcher) {
+        resumeJob?.cancel()
+        resumeJob = scope.launch(ioDispatcher) {
             val history = historyDao?.getHistoryByUriDirect(videoItem.uri)
             if (history != null) {
                 val resumePos = calculateResumePosition(
@@ -267,20 +277,34 @@ class FoxPlayerEngine(
     override fun release() {
         val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
         val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
-        if (abs(pos - lastPersistedPositionMs) >= 1000L) {
+        val finalJob = if (abs(pos - lastPersistedPositionMs) >= 1000L || exoPlayer.playbackState == Player.STATE_ENDED) {
             saveHistory(pos, dur, isEnded = exoPlayer.playbackState == Player.STATE_ENDED)
+        } else {
+            lastSaveJob
         }
         stopProgressUpdates()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()
         scope.cancel()
+
+        // Ensure final history save has a reliable completion path without blocking UI
+        if (finalJob != null && finalJob.isActive) {
+            try {
+                runBlocking(ioDispatcher) {
+                    withTimeoutOrNull(1000L) {
+                        finalJob.join()
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+        historyScope.cancel()
     }
 
-    private fun saveHistory(positionMs: Long, durationMs: Long, isEnded: Boolean) {
+    private fun saveHistory(positionMs: Long, durationMs: Long, isEnded: Boolean): Job? {
         val currentItem = currentVideoItem
         val uri = currentItem?.uri
             ?: exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
-            ?: return
+            ?: return null
         val title = currentItem?.title?.ifBlank { currentItem.displayName }
             ?: exoPlayer.currentMediaItem?.mediaMetadata?.title?.toString()
             ?: "Video"
@@ -298,21 +322,25 @@ class FoxPlayerEngine(
         lastPersistedTimeMs = System.currentTimeMillis()
         lastPersistedUri = uri
 
-        scope.launch(ioDispatcher) {
-            try {
-                val entity = PlaybackHistoryEntity(
-                    videoUri = uri,
-                    title = title,
-                    durationMs = safeDuration,
-                    lastPositionMs = positionMs,
-                    lastPlayedTimestamp = System.currentTimeMillis(),
-                    watchPercentage = percentage
-                )
-                historyDao?.upsertHistory(entity)
-            } catch (_: Throwable) {
-                // Safe database handling
+        val job = historyScope.launch {
+            historyMutex.withLock {
+                try {
+                    val entity = PlaybackHistoryEntity(
+                        videoUri = uri,
+                        title = title,
+                        durationMs = safeDuration,
+                        lastPositionMs = positionMs,
+                        lastPlayedTimestamp = System.currentTimeMillis(),
+                        watchPercentage = percentage
+                    )
+                    historyDao?.upsertHistory(entity)
+                } catch (_: Throwable) {
+                    // Safe database handling
+                }
             }
         }
+        lastSaveJob = job
+        return job
     }
 
     private fun updateState() {

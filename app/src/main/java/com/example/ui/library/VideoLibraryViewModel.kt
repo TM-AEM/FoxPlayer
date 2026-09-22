@@ -12,6 +12,7 @@ import com.example.data.local.database.dao.HistoryDao
 import com.example.data.local.database.entity.PlaybackHistoryEntity
 import com.example.data.repository.MediaRepository
 import com.example.data.repository.MediaRepositoryImpl
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +60,9 @@ class VideoLibraryViewModel @JvmOverloads constructor(
     private val _uiState = MutableStateFlow(VideoLibraryUiState())
     val uiState: StateFlow<VideoLibraryUiState> = _uiState.asStateFlow()
 
+    private var observeVideosJob: Job? = null
+    private var observeHistoryJob: Job? = null
+
     init {
         checkPermissionAndLoad()
         observeHistory()
@@ -66,7 +70,8 @@ class VideoLibraryViewModel @JvmOverloads constructor(
 
     private fun observeHistory() {
         val dao = historyDao ?: return
-        viewModelScope.launch {
+        observeHistoryJob?.cancel()
+        observeHistoryJob = viewModelScope.launch {
             dao.getAllHistory()
                 .catch { /* safe error fallback */ }
                 .collect { historyList ->
@@ -98,7 +103,8 @@ class VideoLibraryViewModel @JvmOverloads constructor(
     }
 
     private fun observeVideos() {
-        viewModelScope.launch {
+        observeVideosJob?.cancel()
+        observeVideosJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             mediaRepository.getVideosFlow()
                 .catch { error ->

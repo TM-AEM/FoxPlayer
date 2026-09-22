@@ -200,11 +200,6 @@ fun PlayerScreen(
         }
     }
 
-    // Configure Auto-Enter PiP for Android 12+ gesture navigation while video is playing
-    LaunchedEffect(playbackState.isPlaying, videoAspectRatio) {
-        PipHelper.updateAutoEnterPip(activity, videoAspectRatio, playbackState.isPlaying)
-    }
-
     // Horizontal Swipe Seek drag tracking state
     var isHorizontalSwiping by remember { mutableStateOf(false) }
     var swipeStartSeekPositionMs by remember { mutableLongStateOf(0L) }
@@ -310,6 +305,11 @@ fun PlayerScreen(
         } else {
             16f / 9f
         }
+    }
+
+    // Configure Auto-Enter PiP for Android 12+ gesture navigation while video is playing
+    LaunchedEffect(playbackState.isPlaying, videoAspectRatio) {
+        PipHelper.updateAutoEnterPip(activity, videoAspectRatio, playbackState.isPlaying)
     }
 
     BoxWithConstraints(

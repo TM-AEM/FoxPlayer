@@ -13,10 +13,12 @@ import com.example.core.model.VideoFolder
 import com.example.core.model.VideoItem
 import com.example.core.util.PermissionUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -55,13 +57,19 @@ class MediaRepositoryImpl(
 
     override fun getVideosFlow(): Flow<List<VideoItem>> = callbackFlow {
         // Query and emit initial data
-        trySend(queryVideos())
+        trySend(queryVideosDirect())
+
+        var queryJob: Job? = null
 
         // Register ContentObserver to listen for MediaStore additions, edits, and deletions
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 super.onChange(selfChange, uri)
-                trySend(queryVideosDirect())
+                // Execute expensive MediaStore query off the main looper on Dispatchers.IO
+                queryJob?.cancel()
+                queryJob = launch(Dispatchers.IO) {
+                    trySend(queryVideosDirect())
+                }
             }
         }
 
@@ -72,6 +80,7 @@ class MediaRepositoryImpl(
         )
 
         awaitClose {
+            queryJob?.cancel()
             contentResolver.unregisterContentObserver(observer)
         }
     }.flowOn(Dispatchers.IO)

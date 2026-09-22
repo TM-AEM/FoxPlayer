@@ -83,5 +83,49 @@ class PlaybackServiceTest {
 
         controller.destroy()
     }
+
+    @Test
+    fun testDuplicatePlaybackRequestDeduplication() {
+        val controller = Robolectric.buildService(PlaybackService::class.java)
+        val service = controller.create().get()
+
+        val videoItem = VideoItem(
+            id = 999L,
+            uri = "content://media/external/video/media/999",
+            title = "Ocean Wave",
+            displayName = "Ocean Wave.mp4",
+            durationMs = 60000L,
+            sizeBytes = 1000000L
+        )
+
+        // Simulate startPlayback (which directly prepares active engine and creates intent)
+        PlaybackService.startPlayback(service, videoItem)
+
+        val engine = PlaybackService.currentEngine
+        assertNotNull(engine)
+        val originalMediaItem = engine?.player?.currentMediaItem
+        assertNotNull(originalMediaItem)
+
+        // Simulate onStartCommand arriving for the exact same startPlayback intent
+        val playIntent = Intent(service, PlaybackService::class.java).apply {
+            action = PlaybackService.ACTION_PLAY_VIDEO
+            putExtra(PlaybackService.EXTRA_REQUEST_ID, System.currentTimeMillis())
+            putExtra(PlaybackService.EXTRA_VIDEO_URI, videoItem.uri)
+            putExtra(PlaybackService.EXTRA_VIDEO_TITLE, videoItem.title)
+            putExtra(PlaybackService.EXTRA_VIDEO_DISPLAY_NAME, videoItem.displayName)
+            putExtra(PlaybackService.EXTRA_VIDEO_ID, videoItem.id)
+            putExtra(PlaybackService.EXTRA_VIDEO_DURATION, videoItem.durationMs)
+            putExtra(PlaybackService.EXTRA_VIDEO_SIZE, videoItem.sizeBytes)
+        }
+
+        // Trigger onStartCommand - engine must still have the video prepared without crash
+        service.onStartCommand(playIntent, 0, 1)
+
+        val mediaItemAfterCommand = engine?.player?.currentMediaItem
+        assertNotNull(mediaItemAfterCommand)
+        assertEquals("content://media/external/video/media/999", mediaItemAfterCommand?.localConfiguration?.uri.toString())
+
+        controller.destroy()
+    }
 }
 
