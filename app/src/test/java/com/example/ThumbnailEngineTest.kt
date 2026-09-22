@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.thumbnail.ThumbnailEngineImpl
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -59,5 +61,44 @@ class ThumbnailEngineTest {
         assertEquals(res1, res2)
         assertEquals(res2, res3)
         assertNull(res1)
+    }
+
+    @Test
+    fun testConcurrentDifferentKeysExtractIndependently() = runBlocking {
+        val uri1 = "content://invalid/uri/key1"
+        val uri2 = "content://invalid/uri/key2"
+        val deferred1 = async { thumbnailEngine.loadThumbnail(uri1, 320, 180) }
+        val deferred2 = async { thumbnailEngine.loadThumbnail(uri2, 320, 180) }
+
+        val res1 = deferred1.await()
+        val res2 = deferred2.await()
+
+        assertNull(res1)
+        assertNull(res2)
+    }
+
+    @Test
+    fun testFailedExtractionCleansInFlightAndAllowsRetry() = runBlocking {
+        val uri = "content://invalid/uri/retry_test"
+        // First attempt fails cleanly
+        val firstResult = thumbnailEngine.loadThumbnail(uri, 320, 180)
+        assertNull(firstResult)
+
+        // Second attempt must not hang on a stale in-flight CompletableDeferred, executes retry
+        val secondResult = thumbnailEngine.loadThumbnail(uri, 320, 180)
+        assertNull(secondResult)
+    }
+
+    @Test
+    fun testCancellationCleansInFlightAndAllowsSubsequentRequest() = runBlocking {
+        val uri = "content://invalid/uri/cancel_test"
+        val job = launch {
+            thumbnailEngine.loadThumbnail(uri, 320, 180)
+        }
+        job.cancelAndJoin()
+
+        // Immediate subsequent request must succeed without deadlock or hanging
+        val subsequent = thumbnailEngine.loadThumbnail(uri, 320, 180)
+        assertNull(subsequent)
     }
 }

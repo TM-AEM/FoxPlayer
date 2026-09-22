@@ -10,6 +10,7 @@ import com.example.ui.library.VideoSortOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -171,5 +172,33 @@ class VideoLibraryViewModelTest {
         assertFalse("Should not be loading after refreshes complete", state.isLoading)
         assertEquals(3, state.videos.size)
         assertTrue("Permission should remain granted", state.isPermissionGranted)
+    }
+
+    @Test
+    fun testStaleCollectorCannotOverwriteNewStateOnRefresh() = runTest(testDispatcher) {
+        val dynamicFlow = MutableSharedFlow<List<VideoItem>>(replay = 1)
+        dynamicFlow.emit(listOf(sampleVideos[0]))
+
+        val dynamicRepo = object : MediaRepository {
+            override fun getVideosFlow(): Flow<List<VideoItem>> = dynamicFlow
+            override suspend fun queryVideos(): List<VideoItem> = sampleVideos
+            override suspend fun getVideoByUri(contentUriString: String): VideoItem? = null
+            override suspend fun getVideoFolders(): List<VideoFolder> = emptyList()
+        }
+
+        val viewModel = VideoLibraryViewModel(application, dynamicRepo)
+        viewModel.onPermissionResult(true)
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.videos.size)
+        assertEquals(1L, viewModel.uiState.value.videos[0].id)
+
+        // Update repository flow with new data and trigger refresh
+        dynamicFlow.emit(listOf(sampleVideos[1], sampleVideos[2]))
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(2, viewModel.uiState.value.videos.size)
+        assertEquals(listOf(2L, 3L), viewModel.uiState.value.videos.map { it.id }.sorted())
     }
 }

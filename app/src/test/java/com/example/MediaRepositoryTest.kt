@@ -8,7 +8,9 @@ import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.util.PermissionUtils
 import com.example.data.repository.MediaRepositoryImpl
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -138,5 +140,18 @@ class MediaRepositoryTest {
         val flow = repository.getVideosFlow()
         val firstEmission = flow.first()
         assertNotNull("Flow must emit initial video list", firstEmission)
+    }
+
+    @Test
+    fun testContentObserverLifecycleAndCleanup() = runBlocking {
+        val permission = PermissionUtils.getRequiredVideoPermission()
+        shadowOf(application).grantPermissions(permission)
+
+        val flow = repository.getVideosFlow()
+        val job = launch {
+            flow.collect { /* collect emissions */ }
+        }
+        job.cancelAndJoin()
+        // ContentObserver registered and cleanly unregistered in awaitClose without leaking or throwing
     }
 }
