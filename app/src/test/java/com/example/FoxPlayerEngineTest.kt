@@ -190,6 +190,7 @@ class FoxPlayerEngineTest {
         customEngine.release()
 
         val saved = kotlinx.coroutines.runBlocking {
+            customEngine.lastSaveJob?.join()
             dao.getHistoryByUriDirect(videoItem.uri)
         }
         assertNotNull(saved)
@@ -198,5 +199,112 @@ class FoxPlayerEngineTest {
         assertEquals(120_000L, saved?.durationMs)
 
         db.close()
+    }
+
+    @Test
+    fun testReleaseDoesNotBlockMainThreadEvenWithSlowDatabase() {
+        assertEquals(android.os.Looper.getMainLooper(), android.os.Looper.myLooper())
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val slowDao = object : com.example.data.local.database.dao.HistoryDao {
+            override fun getAllHistory(): kotlinx.coroutines.flow.Flow<List<com.example.data.local.database.entity.PlaybackHistoryEntity>> = kotlinx.coroutines.flow.emptyFlow()
+            override fun getHistoryByUri(videoUri: String): kotlinx.coroutines.flow.Flow<com.example.data.local.database.entity.PlaybackHistoryEntity?> = kotlinx.coroutines.flow.emptyFlow()
+            override suspend fun getHistoryByUriDirect(videoUri: String): com.example.data.local.database.entity.PlaybackHistoryEntity? = null
+            override suspend fun upsertHistory(history: com.example.data.local.database.entity.PlaybackHistoryEntity) {
+                gate.await()
+            }
+            override suspend fun deleteHistoryByUri(videoUri: String) {}
+            override suspend fun clearAllHistory() {}
+        }
+        val slowEngine = FoxPlayerEngine(context = context, historyDao = slowDao)
+        val videoItem = VideoItem(
+            id = 901L,
+            uri = "content://media/external/video/media/901",
+            title = "Slow DB Test Video",
+            displayName = "slow.mp4",
+            durationMs = 60_000L,
+            sizeBytes = 1024L
+        )
+        slowEngine.prepare(videoItem, playWhenReady = false)
+        slowEngine.seekTo(15_000L)
+
+        // release() is executed directly on the Android Main thread while the database operation is blocked on the gate
+        val startTime = System.currentTimeMillis()
+        slowEngine.release()
+        val durationMs = System.currentTimeMillis() - startTime
+
+        // Must return immediately without waiting for the database write
+        assertTrue("release() blocked the calling thread for $durationMs ms", durationMs < 250L)
+        assertTrue(slowEngine.isReleased)
+        assertNotNull(slowEngine.lastSaveJob)
+        assertTrue(slowEngine.lastSaveJob?.isActive == true)
+
+        // Unblock gate and verify background job completes cleanly
+        gate.complete(Unit)
+        kotlinx.coroutines.runBlocking {
+            slowEngine.lastSaveJob?.join()
+        }
+        assertFalse(slowEngine.lastSaveJob?.isActive == true)
+        assertFalse(slowEngine.isHistoryScopeActive)
+    }
+
+    @Test
+    fun testReleaseIsIdempotent() {
+        val testUri = Uri.parse("content://media/external/video/media/123")
+        engine.prepare(testUri, playWhenReady = false)
+        assertFalse(engine.isReleased)
+
+        engine.release()
+        assertTrue(engine.isReleased)
+
+        // Calling release again must be a safe no-op
+        engine.release()
+        assertTrue(engine.isReleased)
+
+        engine.release()
+        assertTrue(engine.isReleased)
+    }
+
+    @Test
+    fun testHistorySerializationPreservedUnderConcurrentSaves() = kotlinx.coroutines.runBlocking {
+        val db = androidx.room.Room.inMemoryDatabaseBuilder(
+            context,
+            com.example.data.local.database.FoxPlayerDatabase::class.java
+        ).allowMainThreadQueries().build()
+        val dao = db.historyDao()
+        val customEngine = FoxPlayerEngine(context = context, historyDao = dao)
+        val videoItem = VideoItem(
+            id = 902L,
+            uri = "content://media/external/video/media/902",
+            title = "Serialization Test Video",
+            displayName = "serial.mp4",
+            durationMs = 120_000L,
+            sizeBytes = 2048L
+        )
+        customEngine.prepare(videoItem, playWhenReady = false)
+
+        // Rapid state changes and seeks
+        customEngine.seekTo(10_000L)
+        customEngine.pause()
+        customEngine.seekTo(35_000L)
+        customEngine.release()
+
+        customEngine.lastSaveJob?.join()
+        val saved = dao.getHistoryByUriDirect(videoItem.uri)
+        assertNotNull(saved)
+        assertEquals(35_000L, saved?.lastPositionMs)
+        db.close()
+    }
+
+    @Test
+    fun testPlayerAndListenerCleanupOnRelease() {
+        val testUri = Uri.parse("content://media/external/video/media/456")
+        engine.prepare(testUri, playWhenReady = false)
+
+        engine.release()
+        assertTrue(engine.isReleased)
+
+        // Operations after release must be safe and not cause playback
+        engine.play()
+        assertFalse(engine.isPlaying)
     }
 }

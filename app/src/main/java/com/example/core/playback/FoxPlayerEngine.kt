@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -55,7 +54,12 @@ class FoxPlayerEngine(
     private val historyMutex = Mutex()
     private var progressJob: Job? = null
     private var resumeJob: Job? = null
-    private var lastSaveJob: Job? = null
+    internal var lastSaveJob: Job? = null
+        private set
+    internal var isReleased: Boolean = false
+        private set
+    internal val isHistoryScopeActive: Boolean
+        get() = historyScope.isActive
 
     // Track active video item and history throttle state
     private var currentVideoItem: VideoItem? = null
@@ -275,6 +279,9 @@ class FoxPlayerEngine(
     }
 
     override fun release() {
+        if (isReleased) return
+        isReleased = true
+
         val dur = exoPlayer.duration.takeIf { it > 0 } ?: 0L
         val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
         val finalJob = if (abs(pos - lastPersistedPositionMs) >= 1000L || exoPlayer.playbackState == Player.STATE_ENDED) {
@@ -287,20 +294,20 @@ class FoxPlayerEngine(
         exoPlayer.release()
         scope.cancel()
 
-        // Ensure final history save has a reliable completion path without blocking UI
+        // Allow any active final history write to complete asynchronously on ioDispatcher
+        // without blocking the Main thread, then cancel historyScope.
         if (finalJob != null && finalJob.isActive) {
-            try {
-                runBlocking(ioDispatcher) {
-                    withTimeoutOrNull(1000L) {
-                        finalJob.join()
-                    }
-                }
-            } catch (_: Throwable) {}
+            finalJob.invokeOnCompletion {
+                historyScope.cancel()
+            }
+        } else {
+            historyScope.cancel()
         }
-        historyScope.cancel()
     }
 
     private fun saveHistory(positionMs: Long, durationMs: Long, isEnded: Boolean): Job? {
+        if (!historyScope.isActive) return null
+
         val currentItem = currentVideoItem
         val uri = currentItem?.uri
             ?: exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
@@ -323,19 +330,21 @@ class FoxPlayerEngine(
         lastPersistedUri = uri
 
         val job = historyScope.launch {
-            historyMutex.withLock {
-                try {
-                    val entity = PlaybackHistoryEntity(
-                        videoUri = uri,
-                        title = title,
-                        durationMs = safeDuration,
-                        lastPositionMs = positionMs,
-                        lastPlayedTimestamp = System.currentTimeMillis(),
-                        watchPercentage = percentage
-                    )
-                    historyDao?.upsertHistory(entity)
-                } catch (_: Throwable) {
-                    // Safe database handling
+            withTimeoutOrNull(2000L) {
+                historyMutex.withLock {
+                    try {
+                        val entity = PlaybackHistoryEntity(
+                            videoUri = uri,
+                            title = title,
+                            durationMs = safeDuration,
+                            lastPositionMs = positionMs,
+                            lastPlayedTimestamp = System.currentTimeMillis(),
+                            watchPercentage = percentage
+                        )
+                        historyDao?.upsertHistory(entity)
+                    } catch (_: Throwable) {
+                        // Safe database handling
+                    }
                 }
             }
         }
