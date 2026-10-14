@@ -70,10 +70,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun PlayerScreen(
     modifier: Modifier = Modifier,
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    gestureSettingsRepository: com.example.data.repository.GestureSettingsRepository? = null
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+    val effectiveGestureSettingsRepo = remember(context, gestureSettingsRepository) {
+        gestureSettingsRepository ?: com.example.data.repository.GestureSettingsRepositoryImpl.getInstance(context)
+    }
 
     // Configure immersive fullscreen system bars (Edge-to-Edge and hide navigation/status bars)
     DisposableEffect(activity) {
@@ -208,6 +212,18 @@ fun PlayerScreen(
     // Checkpoint 9: Video Aspect Ratio / Resize Mode (Fit, Fill, Zoom)
     var resizeMode by remember { mutableStateOf(ResizeMode.FIT) }
 
+    // User-configurable Gesture Sensitivity Threshold settings state (persisted across app restarts)
+    val persistedGestureSettings by effectiveGestureSettingsRepo.gestureSettingsFlow
+        .collectAsState(initial = GestureSettingsState())
+    var localVolumeSensitivity by remember { mutableStateOf<GestureSensitivity?>(null) }
+    var localBrightnessSensitivity by remember { mutableStateOf<GestureSensitivity?>(null) }
+    var localDoubleTapSeekDuration by remember { mutableStateOf<DoubleTapSeekDuration?>(null) }
+    val gestureSettings = GestureSettingsState(
+        volumeSensitivity = localVolumeSensitivity ?: persistedGestureSettings.volumeSensitivity,
+        brightnessSensitivity = localBrightnessSensitivity ?: persistedGestureSettings.brightnessSensitivity,
+        doubleTapSeekDuration = localDoubleTapSeekDuration ?: persistedGestureSettings.doubleTapSeekDuration
+    )
+
     // Checkpoint 9: Real-time Tracks and Selection parameters state
     var currentTracks by remember { mutableStateOf(activePlayer?.currentTracks ?: Tracks.EMPTY) }
     var currentTrackParameters by remember {
@@ -215,6 +231,40 @@ fun PlayerScreen(
     }
     var currentSpeed by remember {
         mutableFloatStateOf(activePlayer?.playbackParameters?.speed ?: playbackState.playbackSpeed)
+    }
+    // Long-Press 2x Speed Boost state
+    var speedBeforeBoost by remember {
+        mutableFloatStateOf(activePlayer?.playbackParameters?.speed ?: 1.0f)
+    }
+    var isSpeedBoosted by remember { mutableStateOf(false) }
+
+    fun startSpeedBoost() {
+        if (!isSpeedBoosted) {
+            val targetPlayer = controller ?: activePlayer
+            val original = targetPlayer?.playbackParameters?.speed ?: currentSpeed
+            speedBeforeBoost = original
+            isSpeedBoosted = true
+            targetPlayer?.setPlaybackSpeed(2.0f)
+            gestureFeedbackDismissJob?.cancel()
+            gestureFeedback = GestureFeedback.SpeedBoost(2.0f)
+        }
+    }
+
+    fun endSpeedBoost() {
+        if (isSpeedBoosted) {
+            val targetPlayer = controller ?: activePlayer
+            targetPlayer?.setPlaybackSpeed(speedBeforeBoost)
+            isSpeedBoosted = false
+            if (gestureFeedback is GestureFeedback.SpeedBoost) {
+                gestureFeedback = null
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            endSpeedBoost()
+        }
     }
 
     // Auto-hide timer: when HUD is visible and playing, auto-hide after 3.5 seconds of inactivity
@@ -266,7 +316,9 @@ fun PlayerScreen(
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-                currentSpeed = playbackParameters.speed
+                if (!isSpeedBoosted) {
+                    currentSpeed = playbackParameters.speed
+                }
             }
         }
         player.addListener(listener)
@@ -405,7 +457,9 @@ fun PlayerScreen(
                     val targetPlayer = controller ?: activePlayer
                     val current = playbackState.currentPositionMs
                     val duration = playbackState.durationMs
-                    val deltaMs = 10_000L
+                    val seekDuration = gestureSettings.doubleTapSeekDuration
+                    val deltaSeconds = seekDuration.seconds
+                    val deltaMs = seekDuration.durationMillis
                     val targetMs = if (isForward) {
                         if (duration > 0L) (current + deltaMs).coerceIn(0L, duration) else (current + deltaMs).coerceAtLeast(0L)
                     } else {
@@ -413,7 +467,7 @@ fun PlayerScreen(
                     }
                     targetPlayer?.seekTo(targetMs)
                     showTemporaryFeedback(
-                        GestureFeedback.DoubleTapSeek(deltaSeconds = 10, isForward = isForward),
+                        GestureFeedback.DoubleTapSeek(deltaSeconds = deltaSeconds, isForward = isForward),
                         durationMs = 900L
                     )
                     notifyUserInteraction()
@@ -475,7 +529,14 @@ fun PlayerScreen(
                 },
                 onVerticalSwipeEnd = {
                     notifyUserInteraction()
-                }
+                },
+                onLongPressStart = {
+                    startSpeedBoost()
+                },
+                onLongPressEnd = {
+                    endSpeedBoost()
+                },
+                gestureSettings = gestureSettings
             )
         }
 
@@ -588,6 +649,37 @@ fun PlayerScreen(
                     if (targetPlayer != null) {
                         PlayerTrackHelper.selectSubtitleTrack(targetPlayer, mode)
                         currentTrackParameters = targetPlayer.trackSelectionParameters
+                    }
+                    notifyUserInteraction()
+                },
+                gestureSettings = gestureSettings,
+                onVolumeSensitivityChange = { newVolumeSensitivity ->
+                    localVolumeSensitivity = newVolumeSensitivity
+                    coroutineScope.launch {
+                        effectiveGestureSettingsRepo.updateVolumeSensitivity(newVolumeSensitivity)
+                    }
+                    notifyUserInteraction()
+                },
+                onBrightnessSensitivityChange = { newBrightnessSensitivity ->
+                    localBrightnessSensitivity = newBrightnessSensitivity
+                    coroutineScope.launch {
+                        effectiveGestureSettingsRepo.updateBrightnessSensitivity(newBrightnessSensitivity)
+                    }
+                    notifyUserInteraction()
+                },
+                onDoubleTapSeekDurationChange = { newDuration ->
+                    localDoubleTapSeekDuration = newDuration
+                    coroutineScope.launch {
+                        effectiveGestureSettingsRepo.updateDoubleTapSeekDuration(newDuration)
+                    }
+                    notifyUserInteraction()
+                },
+                onGestureSettingsChange = { updatedSettings ->
+                    localVolumeSensitivity = updatedSettings.volumeSensitivity
+                    localBrightnessSensitivity = updatedSettings.brightnessSensitivity
+                    localDoubleTapSeekDuration = updatedSettings.doubleTapSeekDuration
+                    coroutineScope.launch {
+                        effectiveGestureSettingsRepo.updateSettings(updatedSettings)
                     }
                     notifyUserInteraction()
                 },

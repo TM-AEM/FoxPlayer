@@ -1,6 +1,8 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -25,6 +27,7 @@ import com.example.ui.player.SubtitleTrackItem
 import com.google.common.collect.ImmutableList
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -231,6 +234,105 @@ class PlayerTrackAndSettingsTest {
     }
 
     @Test
+    fun testGestureSensitivityThresholdSettingsAdjustment() {
+        var gestureSettings by androidx.compose.runtime.mutableStateOf(
+            com.example.ui.player.GestureSettingsState(
+                volumeSensitivity = com.example.ui.player.GestureSensitivity.MEDIUM,
+                brightnessSensitivity = com.example.ui.player.GestureSensitivity.MEDIUM
+            )
+        )
+
+        composeTestRule.setContent {
+            PlayerSettingsPanel(
+                isOpen = true,
+                currentSpeed = 1.0f,
+                onSpeedSelected = {},
+                currentResizeMode = ResizeMode.FIT,
+                onResizeModeSelected = {},
+                audioTracks = emptyList(),
+                isAudioAuto = true,
+                onAudioTrackSelected = {},
+                subtitleTracks = emptyList(),
+                isSubtitleOff = true,
+                isSubtitleAuto = false,
+                onSubtitleModeSelected = {},
+                gestureSettings = gestureSettings,
+                onGestureSettingsChange = { gestureSettings = it },
+                onDismiss = {}
+            )
+        }
+
+        // Verify Title is displayed
+        composeTestRule.onNodeWithTag("player_settings_gesture_sensitivity_title", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        // Change Volume sensitivity to High
+        composeTestRule.onNodeWithTag("gesture_volume_sensitivity_high", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(com.example.ui.player.GestureSensitivity.HIGH, gestureSettings.volumeSensitivity)
+        assertEquals(12f, gestureSettings.volumeSensitivity.touchSlop, 0.01f)
+        assertEquals(1.45f, gestureSettings.volumeSensitivity.multiplier, 0.01f)
+
+        // Change Brightness sensitivity to Low
+        composeTestRule.onNodeWithTag("gesture_brightness_sensitivity_low", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(com.example.ui.player.GestureSensitivity.LOW, gestureSettings.brightnessSensitivity)
+        assertEquals(26f, gestureSettings.brightnessSensitivity.touchSlop, 0.01f)
+        assertEquals(0.65f, gestureSettings.brightnessSensitivity.multiplier, 0.01f)
+    }
+
+    @Test
+    fun testFieldSpecificSensitivityCallbacksInSettingsPanel() {
+        var updatedVolume: com.example.ui.player.GestureSensitivity? = null
+        var updatedBrightness: com.example.ui.player.GestureSensitivity? = null
+
+        composeTestRule.setContent {
+            PlayerSettingsPanel(
+                isOpen = true,
+                currentSpeed = 1.0f,
+                onSpeedSelected = {},
+                currentResizeMode = ResizeMode.FIT,
+                onResizeModeSelected = {},
+                audioTracks = emptyList(),
+                isAudioAuto = true,
+                onAudioTrackSelected = {},
+                subtitleTracks = emptyList(),
+                isSubtitleOff = true,
+                isSubtitleAuto = false,
+                onSubtitleModeSelected = {},
+                gestureSettings = com.example.ui.player.GestureSettingsState(),
+                onVolumeSensitivityChange = { updatedVolume = it },
+                onBrightnessSensitivityChange = { updatedBrightness = it },
+                onDismiss = {}
+            )
+        }
+
+        // Change Volume sensitivity to High via field-specific callback
+        composeTestRule.onNodeWithTag("gesture_volume_sensitivity_high", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(com.example.ui.player.GestureSensitivity.HIGH, updatedVolume)
+        assertEquals(null, updatedBrightness)
+
+        // Change Brightness sensitivity to Low via field-specific callback
+        composeTestRule.onNodeWithTag("gesture_brightness_sensitivity_low", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(com.example.ui.player.GestureSensitivity.LOW, updatedBrightness)
+    }
+
+    @Test
     fun testPlayerHudSettingsButton() {
         var settingsClicked = false
 
@@ -255,5 +357,101 @@ class PlayerTrackAndSettingsTest {
             .performClick()
 
         assertTrue(settingsClicked)
+    }
+
+    @Test
+    fun testDoubleTapSeekDurationCallbackInSettingsPanel() {
+        var updatedDuration: com.example.ui.player.DoubleTapSeekDuration? = null
+
+        composeTestRule.setContent {
+            PlayerSettingsPanel(
+                isOpen = true,
+                currentSpeed = 1.0f,
+                onSpeedSelected = {},
+                currentResizeMode = ResizeMode.FIT,
+                onResizeModeSelected = {},
+                audioTracks = emptyList(),
+                isAudioAuto = true,
+                onAudioTrackSelected = {},
+                subtitleTracks = emptyList(),
+                isSubtitleOff = true,
+                isSubtitleAuto = false,
+                onSubtitleModeSelected = {},
+                gestureSettings = com.example.ui.player.GestureSettingsState(),
+                onDoubleTapSeekDurationChange = { updatedDuration = it },
+                onDismiss = {}
+            )
+        }
+
+        // Verify title is displayed
+        composeTestRule.onNodeWithTag("player_settings_double_tap_seek_title", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        // Verify all 4 options are available in UI
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_5s", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_10s", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_15s", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_30s", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        // Click 15s option
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_15s", useUnmergedTree = true)
+            .performClick()
+        assertEquals(com.example.ui.player.DoubleTapSeekDuration.FIFTEEN, updatedDuration)
+
+        // Click 30s option
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_30s", useUnmergedTree = true)
+            .performClick()
+        assertEquals(com.example.ui.player.DoubleTapSeekDuration.THIRTY, updatedDuration)
+
+        // Click 5s option
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_5s", useUnmergedTree = true)
+            .performClick()
+        assertEquals(com.example.ui.player.DoubleTapSeekDuration.FIVE, updatedDuration)
+    }
+
+    @Test
+    fun testDoubleTapSeekDurationFallbackToFullStateChangeWhenCallbackNull() {
+        var updatedSettingsState: com.example.ui.player.GestureSettingsState? = null
+
+        composeTestRule.setContent {
+            PlayerSettingsPanel(
+                isOpen = true,
+                currentSpeed = 1.0f,
+                onSpeedSelected = {},
+                currentResizeMode = ResizeMode.FIT,
+                onResizeModeSelected = {},
+                audioTracks = emptyList(),
+                isAudioAuto = true,
+                onAudioTrackSelected = {},
+                subtitleTracks = emptyList(),
+                isSubtitleOff = true,
+                isSubtitleAuto = false,
+                onSubtitleModeSelected = {},
+                gestureSettings = com.example.ui.player.GestureSettingsState(
+                    doubleTapSeekDuration = com.example.ui.player.DoubleTapSeekDuration.TEN
+                ),
+                onGestureSettingsChange = { updatedSettingsState = it },
+                onDoubleTapSeekDurationChange = null,
+                onDismiss = {}
+            )
+        }
+
+        // Click 30s option -> should invoke onGestureSettingsChange with DoubleTapSeekDuration.THIRTY
+        composeTestRule.onNodeWithTag("gesture_double_tap_seek_30s", useUnmergedTree = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertNotNull(updatedSettingsState)
+        assertEquals(com.example.ui.player.DoubleTapSeekDuration.THIRTY, updatedSettingsState?.doubleTapSeekDuration)
     }
 }

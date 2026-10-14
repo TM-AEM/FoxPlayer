@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -80,7 +80,7 @@ fun VideoThumbnail(
         } else {
             // Elegant placeholder
             Icon(
-                imageVector = Icons.Rounded.Movie,
+                painter = painterResource(id = R.drawable.ic_movie),
                 contentDescription = contentDescription ?: "Video Thumbnail Placeholder",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier

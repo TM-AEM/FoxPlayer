@@ -49,32 +49,63 @@ fun PlayerGestureDetector(
     onVerticalSwipeBrightnessChange: (deltaFraction: Float) -> Unit,
     onVerticalSwipeVolumeChange: (deltaFraction: Float) -> Unit,
     onVerticalSwipeEnd: () -> Unit,
+    onLongPressStart: () -> Unit = {},
+    onLongPressEnd: () -> Unit = {},
+    gestureSettings: GestureSettingsState = GestureSettingsState(),
     modifier: Modifier = Modifier
 ) {
     var componentSize by remember { mutableStateOf(IntSize.Zero) }
 
+    var isLongPressing by remember { mutableStateOf(false) }
     var dragMode by remember { mutableStateOf(DragMode.NONE) }
     var totalDragX by remember { mutableFloatStateOf(0f) }
     var totalDragY by remember { mutableFloatStateOf(0f) }
 
-    val touchSlop = 18f
+    val currentGestureSettings by androidx.compose.runtime.rememberUpdatedState(gestureSettings)
+    val currentOnSingleTap by androidx.compose.runtime.rememberUpdatedState(onSingleTap)
+    val currentOnDoubleTapSeek by androidx.compose.runtime.rememberUpdatedState(onDoubleTapSeek)
+    val currentOnHorizontalSwipeSeekStart by androidx.compose.runtime.rememberUpdatedState(onHorizontalSwipeSeekStart)
+    val currentOnHorizontalSwipeSeekChange by androidx.compose.runtime.rememberUpdatedState(onHorizontalSwipeSeekChange)
+    val currentOnHorizontalSwipeSeekEnd by androidx.compose.runtime.rememberUpdatedState(onHorizontalSwipeSeekEnd)
+    val currentOnVerticalSwipeBrightnessChange by androidx.compose.runtime.rememberUpdatedState(onVerticalSwipeBrightnessChange)
+    val currentOnVerticalSwipeVolumeChange by androidx.compose.runtime.rememberUpdatedState(onVerticalSwipeVolumeChange)
+    val currentOnVerticalSwipeEnd by androidx.compose.runtime.rememberUpdatedState(onVerticalSwipeEnd)
+    val currentOnLongPressStart by androidx.compose.runtime.rememberUpdatedState(onLongPressStart)
+    val currentOnLongPressEnd by androidx.compose.runtime.rememberUpdatedState(onLongPressEnd)
+
+    val defaultTouchSlop = 18f
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged { componentSize = it }
             .testTag("player_gesture_detector")
-            // Tap gestures: Single tap toggle HUD, Double tap ±10s seek
+            // Tap gestures: Single tap toggle HUD, Double tap ±10s seek, Long press 2x speed boost
             .pointerInput(componentSize) {
                 detectTapGestures(
+                    onPress = {
+                        isLongPressing = false
+                        try {
+                            tryAwaitRelease()
+                        } finally {
+                            if (isLongPressing) {
+                                isLongPressing = false
+                                currentOnLongPressEnd()
+                            }
+                        }
+                    },
+                    onLongPress = {
+                        isLongPressing = true
+                        currentOnLongPressStart()
+                    },
                     onTap = {
-                        onSingleTap()
+                        currentOnSingleTap()
                     },
                     onDoubleTap = { offset ->
                         val halfWidth = componentSize.width / 2
                         if (halfWidth > 0) {
                             val isForward = offset.x >= halfWidth
-                            onDoubleTapSeek(isForward)
+                            currentOnDoubleTapSeek(isForward)
                         }
                     }
                 )
@@ -83,6 +114,10 @@ fun PlayerGestureDetector(
             .pointerInput(componentSize) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        if (isLongPressing) {
+                            isLongPressing = false
+                            currentOnLongPressEnd()
+                        }
                         dragMode = DragMode.NONE
                         totalDragX = 0f
                         totalDragY = 0f
@@ -101,13 +136,19 @@ fun PlayerGestureDetector(
                             val absX = abs(totalDragX)
                             val absY = abs(totalDragY)
 
-                            if (absX > touchSlop || absY > touchSlop) {
+                            val startX = change.position.x - totalDragX
+                            val isLeftHalf = startX < (width / 2f)
+                            val effectiveVerticalSlop = if (isLeftHalf) {
+                                currentGestureSettings.brightnessSensitivity.touchSlop
+                            } else {
+                                currentGestureSettings.volumeSensitivity.touchSlop
+                            }
+
+                            if (absX > defaultTouchSlop || absY > effectiveVerticalSlop) {
                                 if (absX > absY) {
                                     dragMode = DragMode.HORIZONTAL_SEEK
-                                    onHorizontalSwipeSeekStart()
+                                    currentOnHorizontalSwipeSeekStart()
                                 } else {
-                                    val startX = change.position.x - totalDragX
-                                    val isLeftHalf = startX < (width / 2f)
                                     dragMode = if (isLeftHalf) {
                                         DragMode.VERTICAL_LEFT_BRIGHTNESS
                                     } else {
@@ -120,17 +161,19 @@ fun PlayerGestureDetector(
                         // Process ongoing drag according to classified mode
                         when (dragMode) {
                             DragMode.HORIZONTAL_SEEK -> {
-                                onHorizontalSwipeSeekChange(totalDragX, width)
+                                currentOnHorizontalSwipeSeekChange(totalDragX, width)
                             }
                             DragMode.VERTICAL_LEFT_BRIGHTNESS -> {
                                 // Upwards drag -> increase brightness; Downwards -> decrease
-                                val deltaFraction = -dragAmount.y / height.toFloat()
-                                onVerticalSwipeBrightnessChange(deltaFraction)
+                                val multiplier = currentGestureSettings.brightnessSensitivity.multiplier
+                                val deltaFraction = (-dragAmount.y / height.toFloat()) * multiplier
+                                currentOnVerticalSwipeBrightnessChange(deltaFraction)
                             }
                             DragMode.VERTICAL_RIGHT_VOLUME -> {
                                 // Upwards drag -> increase volume; Downwards -> decrease
-                                val deltaFraction = -dragAmount.y / height.toFloat()
-                                onVerticalSwipeVolumeChange(deltaFraction)
+                                val multiplier = currentGestureSettings.volumeSensitivity.multiplier
+                                val deltaFraction = (-dragAmount.y / height.toFloat()) * multiplier
+                                currentOnVerticalSwipeVolumeChange(deltaFraction)
                             }
                             DragMode.NONE -> {
                                 // Within touch slop, waiting for direction lock
@@ -139,9 +182,9 @@ fun PlayerGestureDetector(
                     },
                     onDragEnd = {
                         when (dragMode) {
-                            DragMode.HORIZONTAL_SEEK -> onHorizontalSwipeSeekEnd()
+                            DragMode.HORIZONTAL_SEEK -> currentOnHorizontalSwipeSeekEnd()
                             DragMode.VERTICAL_LEFT_BRIGHTNESS,
-                            DragMode.VERTICAL_RIGHT_VOLUME -> onVerticalSwipeEnd()
+                            DragMode.VERTICAL_RIGHT_VOLUME -> currentOnVerticalSwipeEnd()
                             DragMode.NONE -> {}
                         }
                         dragMode = DragMode.NONE
@@ -150,9 +193,9 @@ fun PlayerGestureDetector(
                     },
                     onDragCancel = {
                         when (dragMode) {
-                            DragMode.HORIZONTAL_SEEK -> onHorizontalSwipeSeekEnd()
+                            DragMode.HORIZONTAL_SEEK -> currentOnHorizontalSwipeSeekEnd()
                             DragMode.VERTICAL_LEFT_BRIGHTNESS,
-                            DragMode.VERTICAL_RIGHT_VOLUME -> onVerticalSwipeEnd()
+                            DragMode.VERTICAL_RIGHT_VOLUME -> currentOnVerticalSwipeEnd()
                             DragMode.NONE -> {}
                         }
                         dragMode = DragMode.NONE

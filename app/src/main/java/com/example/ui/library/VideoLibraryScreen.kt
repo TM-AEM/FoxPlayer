@@ -19,14 +19,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -115,7 +114,7 @@ fun VideoLibraryScreen(
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Rounded.VideoLibrary,
+                                painter = painterResource(id = R.drawable.ic_video_library),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
@@ -151,7 +150,7 @@ fun VideoLibraryScreen(
                             modifier = Modifier.testTag("sort_menu_button")
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.Sort,
+                                painter = painterResource(id = R.drawable.ic_sort),
                                 contentDescription = "Sort Options"
                             )
                         }
@@ -479,7 +478,7 @@ private fun EmptyLibraryView(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Rounded.FolderOpen,
+            painter = painterResource(id = R.drawable.ic_folder_open),
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.outline

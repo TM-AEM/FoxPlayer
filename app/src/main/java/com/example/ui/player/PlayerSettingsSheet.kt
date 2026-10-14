@@ -72,6 +72,12 @@ fun PlayerSettingsPanel(
     isSubtitleOff: Boolean,
     isSubtitleAuto: Boolean,
     onSubtitleModeSelected: (SubtitleSelectionMode) -> Unit,
+    gestureSettings: GestureSettingsState = GestureSettingsState(),
+    onGestureSettingsChange: (GestureSettingsState) -> Unit = {},
+    onVolumeSensitivityChange: ((GestureSensitivity) -> Unit)? = null,
+    onBrightnessSensitivityChange: ((GestureSensitivity) -> Unit)? = null,
+    onDoubleTapSeekDurationChange: ((DoubleTapSeekDuration) -> Unit)? = null,
+    onSeekDurationSecondsChange: ((Int) -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -319,6 +325,178 @@ fun PlayerSettingsPanel(
                                 isSelected = !isSubtitleOff && !isSubtitleAuto && track.isSelected,
                                 onClick = { onSubtitleModeSelected(SubtitleSelectionMode.Track(track)) },
                                 testTag = "subtitle_track_${track.id}"
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Section 5: Gesture Sensitivity Thresholds
+                    Text(
+                        text = "Gesture Sensitivity",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF90CAF9)
+                        ),
+                        modifier = Modifier.testTag("player_settings_gesture_sensitivity_title")
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Adjust the swipe distance threshold and response speed for vertical controls.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Volume Gesture Threshold Selector
+                    Text(
+                        text = "Volume Gesture (Right Side): ${gestureSettings.volumeSensitivity.label}",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GestureSensitivity.values().forEach { sensitivity ->
+                            val isSelected = gestureSettings.volumeSensitivity == sensitivity
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    if (onVolumeSensitivityChange != null) {
+                                        onVolumeSensitivityChange(sensitivity)
+                                    } else {
+                                        onGestureSettingsChange(
+                                            gestureSettings.copy(volumeSensitivity = sensitivity)
+                                        )
+                                    }
+                                },
+                                label = { Text(sensitivity.label) },
+                                leadingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = Color(0xFF2C2C32),
+                                    labelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("gesture_volume_sensitivity_${sensitivity.name.lowercase()}")
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Brightness Gesture Threshold Selector
+                    Text(
+                        text = "Brightness Gesture (Left Side): ${gestureSettings.brightnessSensitivity.label}",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GestureSensitivity.values().forEach { sensitivity ->
+                            val isSelected = gestureSettings.brightnessSensitivity == sensitivity
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    if (onBrightnessSensitivityChange != null) {
+                                        onBrightnessSensitivityChange(sensitivity)
+                                    } else {
+                                        onGestureSettingsChange(
+                                            gestureSettings.copy(brightnessSensitivity = sensitivity)
+                                        )
+                                    }
+                                },
+                                label = { Text(sensitivity.label) },
+                                leadingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = Color(0xFF2C2C32),
+                                    labelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("gesture_brightness_sensitivity_${sensitivity.name.lowercase()}")
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Double-Tap Seek Duration Selector
+                    Text(
+                        text = "Double-Tap Seek: ${gestureSettings.doubleTapSeekDuration.label}",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White
+                        ),
+                        modifier = Modifier.testTag("player_settings_double_tap_seek_title")
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DoubleTapSeekDuration.values().forEach { duration ->
+                            val isSelected = gestureSettings.doubleTapSeekDuration == duration
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    if (onDoubleTapSeekDurationChange != null) {
+                                        onDoubleTapSeekDurationChange(duration)
+                                    } else if (onSeekDurationSecondsChange != null) {
+                                        onSeekDurationSecondsChange(duration.seconds)
+                                    } else {
+                                        onGestureSettingsChange(
+                                            gestureSettings.copy(doubleTapSeekDuration = duration)
+                                        )
+                                    }
+                                },
+                                label = { Text(duration.label) },
+                                leadingIcon = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = Color(0xFF2C2C32),
+                                    labelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("gesture_double_tap_seek_${duration.seconds}s")
                             )
                         }
                     }

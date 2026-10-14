@@ -19,3 +19,17 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Preserve enum constant field names persisted as strings in DataStore.
+-keepclassmembers enum com.example.ui.player.GestureSensitivity {
+    public static final com.example.ui.player.GestureSensitivity LOW;
+    public static final com.example.ui.player.GestureSensitivity MEDIUM;
+    public static final com.example.ui.player.GestureSensitivity HIGH;
+}
+
+-keepclassmembers enum com.example.ui.player.DoubleTapSeekDuration {
+    public static final com.example.ui.player.DoubleTapSeekDuration FIVE;
+    public static final com.example.ui.player.DoubleTapSeekDuration TEN;
+    public static final com.example.ui.player.DoubleTapSeekDuration FIFTEEN;
+    public static final com.example.ui.player.DoubleTapSeekDuration THIRTY;
+}

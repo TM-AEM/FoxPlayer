@@ -21,9 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +47,7 @@ sealed class GestureFeedback {
     data class SwipeSeek(val targetPositionMs: Long, val deltaMs: Long, val durationMs: Long) : GestureFeedback()
     data class Volume(val volumePercent: Int) : GestureFeedback()
     data class Brightness(val brightnessPercent: Int) : GestureFeedback()
+    data class SpeedBoost(val speed: Float = 2.0f) : GestureFeedback()
 }
 
 /**
@@ -96,8 +96,8 @@ fun GestureFeedbackOverlay(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = if (doubleTap.isForward) Icons.Filled.FastForward else Icons.Filled.FastRewind,
-                            contentDescription = if (doubleTap.isForward) "+10s" else "-10s",
+                            painter = painterResource(id = if (doubleTap.isForward) R.drawable.ic_fast_forward else R.drawable.ic_fast_rewind),
+                            contentDescription = if (doubleTap.isForward) "+${doubleTap.deltaSeconds}s" else "-${doubleTap.deltaSeconds}s",
                             tint = Color.White,
                             modifier = Modifier.size(32.dp)
                         )
@@ -185,6 +185,46 @@ fun GestureFeedbackOverlay(
                     percent = bright.brightnessPercent,
                     testTag = "feedback_brightness_indicator"
                 )
+            }
+        }
+
+        // Long-Press 2x Speed Boost Indicator (Top Center)
+        AnimatedVisibility(
+            visible = feedback is GestureFeedback.SpeedBoost,
+            enter = fadeIn(tween(150)) + scaleIn(tween(150), initialScale = 0.9f),
+            exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.9f),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 48.dp)
+        ) {
+            val boost = feedback as? GestureFeedback.SpeedBoost
+            if (boost != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.75f))
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .testTag("feedback_speed_boost"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_fast_forward),
+                            contentDescription = "2x Speed",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "2X Speed",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
     }

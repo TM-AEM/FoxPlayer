@@ -21,10 +21,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -164,7 +165,7 @@ fun PlayerHud(
                         modifier = Modifier.testTag("player_hud_pip_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PictureInPictureAlt,
+                            painter = painterResource(id = R.drawable.ic_pip),
                             contentDescription = "Picture in Picture",
                             tint = Color.White
                         )
