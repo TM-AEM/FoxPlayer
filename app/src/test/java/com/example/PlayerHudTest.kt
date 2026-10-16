@@ -138,4 +138,33 @@ class PlayerHudTest {
         // Video default title
         composeTestRule.onNodeWithText("Video").assertIsDisplayed()
     }
+
+    @Test
+    fun testHudTimelineUnderRtlContextMaintainsLtrPhysicalDirection() {
+        composeTestRule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl
+            ) {
+                PlayerHud(
+                    isVisible = true,
+                    title = "فيديو تجريبي",
+                    isPlaying = false,
+                    currentPositionMs = 65000L, // 01:05
+                    durationMs = 180000L,       // 03:00
+                    bufferedPositionMs = 90000L,
+                    onPlayPauseClick = {},
+                    onSeek = {},
+                    onBack = {},
+                    onUserInteraction = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("player_hud_overlay").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("player_hud_timeline_slider").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("player_hud_current_position").assertIsDisplayed()
+        composeTestRule.onNodeWithText("01:05").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("player_hud_duration").assertIsDisplayed()
+        composeTestRule.onNodeWithText("03:00").assertIsDisplayed()
+    }
 }

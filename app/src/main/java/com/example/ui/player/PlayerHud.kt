@@ -35,6 +35,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,9 +46,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.util.FormatUtils
@@ -243,63 +246,66 @@ fun PlayerHud(
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .testTag("player_hud_bottom_bar")
             ) {
-                // Slider
-                val sliderValue = if (safeDuration > 0L) {
-                    (displayPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
+                // Force physical LTR progression for timeline slider and timestamps across all locales
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    // Slider
+                    val sliderValue = if (safeDuration > 0L) {
+                        (displayPositionMs.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
 
-                Slider(
-                    value = sliderValue,
-                    onValueChange = { fraction ->
-                        onUserInteraction()
-                        isScrubbing = true
-                        scrubPositionMs = (fraction * safeDuration)
-                    },
-                    onValueChangeFinished = {
-                        isScrubbing = false
-                        onUserInteraction()
-                        if (safeDuration > 0L) {
-                            onSeek(scrubPositionMs.toLong().coerceIn(0L, safeDuration))
-                        }
-                    },
-                    enabled = safeDuration > 0L,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("player_hud_timeline_slider")
-                )
-
-                // Time labels: Current position and Total duration
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = FormatUtils.formatDuration(displayPositionMs),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { fraction ->
+                            onUserInteraction()
+                            isScrubbing = true
+                            scrubPositionMs = (fraction * safeDuration)
+                        },
+                        onValueChangeFinished = {
+                            isScrubbing = false
+                            onUserInteraction()
+                            if (safeDuration > 0L) {
+                                onSeek(scrubPositionMs.toLong().coerceIn(0L, safeDuration))
+                            }
+                        },
+                        enabled = safeDuration > 0L,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                         ),
-                        modifier = Modifier.testTag("player_hud_current_position")
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("player_hud_timeline_slider")
                     )
 
-                    Text(
-                        text = FormatUtils.formatDuration(safeDuration),
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal
-                        ),
-                        modifier = Modifier.testTag("player_hud_duration")
-                    )
+                    // Time labels: Current position and Total duration
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = FormatUtils.formatDuration(displayPositionMs),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            modifier = Modifier.testTag("player_hud_current_position")
+                        )
+
+                        Text(
+                            text = FormatUtils.formatDuration(safeDuration),
+                            color = Color.White.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal
+                            ),
+                            modifier = Modifier.testTag("player_hud_duration")
+                        )
+                    }
                 }
             }
         }

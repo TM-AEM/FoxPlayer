@@ -57,7 +57,12 @@ class MediaRepositoryImpl(
 
     override fun getVideosFlow(): Flow<List<VideoItem>> = callbackFlow {
         // Query and emit initial data
-        trySend(queryVideosDirect())
+        try {
+            trySend(queryVideosDirect())
+        } catch (e: Exception) {
+            close(e)
+            return@callbackFlow
+        }
 
         var queryJob: Job? = null
 
@@ -68,7 +73,11 @@ class MediaRepositoryImpl(
                 // Execute expensive MediaStore query off the main looper on Dispatchers.IO
                 queryJob?.cancel()
                 queryJob = launch(Dispatchers.IO) {
-                    trySend(queryVideosDirect())
+                    try {
+                        trySend(queryVideosDirect())
+                    } catch (e: Exception) {
+                        close(e)
+                    }
                 }
             }
         }
@@ -139,6 +148,7 @@ class MediaRepositoryImpl(
                 val dateModifiedColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_MODIFIED)
                 val mimeTypeColumn = cursor.getColumnIndex(MediaStore.Video.Media.MIME_TYPE)
                 val bucketNameColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
+                val bucketIdColumn = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_ID)
 
                 val relativePathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     cursor.getColumnIndex(MediaStore.Video.Media.RELATIVE_PATH)
@@ -196,6 +206,8 @@ class MediaRepositoryImpl(
                         else -> "Videos"
                     }
 
+                    val bucketId = if (bucketIdColumn != -1) cursor.getString(bucketIdColumn) ?: bucketName else bucketName
+
                     // Exclude invalid non-video entries or corrupted zero-byte files
                     if (sizeBytes > 0) {
                         videoList.add(
@@ -211,15 +223,16 @@ class MediaRepositoryImpl(
                                 dateModified = dateModified,
                                 relativePath = relativePath,
                                 bucketName = bucketName,
-                                mimeType = mimeType
+                                mimeType = mimeType,
+                                bucketId = bucketId
                             )
                         )
                     }
                 }
-            }
+            } ?: throw IllegalStateException("MediaStore content provider query returned null cursor")
         } catch (e: Exception) {
-            // Log or handle gracefully without throwing uncaught exceptions to caller
-            return emptyList()
+            // Re-throw so flow callers (e.g. ViewModel) can distinguish query failure from empty library
+            throw e
         }
 
         return videoList
@@ -319,14 +332,15 @@ class MediaRepositoryImpl(
         val folderMap = mutableMapOf<String, MutableList<VideoItem>>()
 
         for (video in videos) {
-            val key = video.bucketName.ifBlank { "Videos" }
+            val key = video.bucketId.ifBlank { video.bucketName.ifBlank { "Videos" } }
             folderMap.getOrPut(key) { mutableListOf() }.add(video)
         }
 
-        folderMap.map { (bucketName, videoList) ->
+        folderMap.map { (bucketId, videoList) ->
+            val folderName = videoList.firstOrNull()?.bucketName?.ifBlank { "Videos" } ?: "Videos"
             VideoFolder(
-                bucketId = bucketName,
-                name = bucketName,
+                bucketId = bucketId,
+                name = folderName,
                 path = videoList.firstOrNull()?.relativePath ?: "",
                 videoCount = videoList.size
             )

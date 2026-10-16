@@ -33,12 +33,28 @@ class ThumbnailEngineTest {
     @Test
     fun testCacheOperations() {
         // Initially empty
-        assertNull(thumbnailEngine.getCachedThumbnail("content://media/external/video/media/1"))
+        val testUri1 = "content://media/external/video/media/1"
+        val testUri2 = "content://media/external/video/media/2"
+        assertNull(thumbnailEngine.getCachedThumbnail(testUri1))
         assertEquals(0, thumbnailEngine.getCacheCount())
 
-        // Clear empty cache does not crash
+        // Insert first bitmap and verify exact item count
+        val bitmap1 = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        thumbnailEngine.putThumbnailInCache(testUri1, bitmap1)
+        assertEquals(1, thumbnailEngine.getCacheCount())
+        assertNotNull(thumbnailEngine.getCachedThumbnail(testUri1))
+
+        // Insert second bitmap and verify count increases to 2
+        val bitmap2 = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888)
+        thumbnailEngine.putThumbnailInCache(testUri2, bitmap2)
+        assertEquals(2, thumbnailEngine.getCacheCount())
+        assertNotNull(thumbnailEngine.getCachedThumbnail(testUri2))
+
+        // Clear cache and verify count drops to 0 and items are evicted
         thumbnailEngine.clearCache()
         assertEquals(0, thumbnailEngine.getCacheCount())
+        assertNull(thumbnailEngine.getCachedThumbnail(testUri1))
+        assertNull(thumbnailEngine.getCachedThumbnail(testUri2))
     }
 
     @Test

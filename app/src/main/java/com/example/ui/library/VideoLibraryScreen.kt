@@ -19,12 +19,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.example.R
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -69,7 +71,8 @@ import com.example.ui.components.VideoThumbnail
 fun VideoLibraryScreen(
     modifier: Modifier = Modifier,
     viewModel: VideoLibraryViewModel = viewModel(),
-    onVideoClick: (VideoItem) -> Unit = {}
+    onVideoClick: (VideoItem) -> Unit = {},
+    onSettingsClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
@@ -91,7 +94,7 @@ fun VideoLibraryScreen(
                         OutlinedTextField(
                             value = uiState.searchQuery,
                             onValueChange = { viewModel.onSearchQueryChanged(it) },
-                            placeholder = { Text("Search videos...") },
+                            placeholder = { Text(stringResource(R.string.library_search_hint)) },
                             singleLine = true,
                             trailingIcon = {
                                 if (uiState.searchQuery.isNotEmpty()) {
@@ -99,7 +102,10 @@ fun VideoLibraryScreen(
                                         onClick = { viewModel.onSearchQueryChanged("") },
                                         modifier = Modifier.testTag("clear_search_button")
                                     ) {
-                                        Icon(Icons.Rounded.Close, contentDescription = "Clear Search")
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.library_clear_search)
+                                        )
                                     }
                                 }
                             },
@@ -121,7 +127,7 @@ fun VideoLibraryScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "FoxPlayer",
+                                text = stringResource(R.string.app_name),
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleLarge
                             )
@@ -139,7 +145,7 @@ fun VideoLibraryScreen(
                     ) {
                         Icon(
                             imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                            contentDescription = if (isSearchActive) "Close Search" else "Search Videos"
+                            contentDescription = if (isSearchActive) stringResource(R.string.library_close_search) else stringResource(R.string.library_search_hint)
                         )
                     }
 
@@ -151,7 +157,7 @@ fun VideoLibraryScreen(
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_sort),
-                                contentDescription = "Sort Options"
+                                contentDescription = stringResource(R.string.library_sort_options)
                             )
                         }
 
@@ -176,6 +182,17 @@ fun VideoLibraryScreen(
                                 )
                             }
                         }
+                    }
+
+                    // Settings button
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("library_settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.settings_title)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -407,7 +424,7 @@ private fun LoadingView(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Scanning videos...",
+            text = stringResource(R.string.library_scanning),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -438,14 +455,14 @@ private fun PermissionDeniedView(
         )
         Spacer(modifier = Modifier.height(20.dp))
         Text(
-            text = "Storage Permission Required",
+            text = stringResource(R.string.library_permission_title),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "FoxPlayer needs permission to scan and display your local video collection.",
+            text = stringResource(R.string.library_permission_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp)
@@ -455,7 +472,7 @@ private fun PermissionDeniedView(
             onClick = onRequestPermission,
             modifier = Modifier.testTag("grant_permission_button")
         ) {
-            Text("Grant Permission")
+            Text(stringResource(R.string.library_grant_permission))
         }
     }
 }
@@ -485,14 +502,14 @@ private fun EmptyLibraryView(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (isSearching) "No matching videos" else "No videos found",
+            text = if (isSearching) stringResource(R.string.library_no_matching_videos) else stringResource(R.string.library_empty_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = if (isSearching) "Try a different search keyword" else "No video files were detected in your device storage.",
+            text = if (isSearching) stringResource(R.string.library_try_different_search) else stringResource(R.string.library_empty_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -503,7 +520,7 @@ private fun EmptyLibraryView(
         ) {
             Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Refresh")
+            Text(stringResource(R.string.library_refresh))
         }
     }
 }
@@ -533,7 +550,7 @@ private fun ErrorView(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Something went wrong",
+            text = stringResource(R.string.library_error_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.error
@@ -549,7 +566,7 @@ private fun ErrorView(
             onClick = onRetry,
             modifier = Modifier.testTag("retry_button")
         ) {
-            Text("Retry")
+            Text(stringResource(R.string.library_retry))
         }
     }
 }

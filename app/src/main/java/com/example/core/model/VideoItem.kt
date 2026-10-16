@@ -18,5 +18,6 @@ data class VideoItem(
     val dateModified: Long = 0L,
     val relativePath: String = "",
     val bucketName: String = "",
-    val mimeType: String = "video/*"
+    val mimeType: String = "video/*",
+    val bucketId: String = ""
 )

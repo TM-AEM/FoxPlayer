@@ -28,6 +28,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.example.data.repository.AppSettingsRepository
+import com.example.data.repository.AppSettingsRepositoryImpl
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -45,6 +48,7 @@ class FoxPlayerEngine(
     context: Context,
     val exoPlayer: ExoPlayer = buildExoPlayer(context),
     private val historyDao: HistoryDao? = try { FoxPlayerDatabase.getInstance(context).historyDao() } catch (_: Throwable) { null },
+    private val appSettingsRepository: AppSettingsRepository? = try { AppSettingsRepositoryImpl.getInstance(context) } catch (_: Throwable) { null },
     private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : PlayerEngine {
@@ -164,6 +168,13 @@ class FoxPlayerEngine(
         // Asynchronously check history to resume position without blocking UI
         resumeJob?.cancel()
         resumeJob = scope.launch(ioDispatcher) {
+            val shouldResume = try {
+                appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
+            } catch (_: Throwable) {
+                true
+            }
+            if (!shouldResume) return@launch
+
             val history = historyDao?.getHistoryByUriDirect(uriString)
             if (history != null) {
                 val resumePos = calculateResumePosition(history.lastPositionMs, history.durationMs)
@@ -199,6 +210,13 @@ class FoxPlayerEngine(
         // Asynchronously check history to resume position without blocking UI
         resumeJob?.cancel()
         resumeJob = scope.launch(ioDispatcher) {
+            val shouldResume = try {
+                appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
+            } catch (_: Throwable) {
+                true
+            }
+            if (!shouldResume) return@launch
+
             val history = historyDao?.getHistoryByUriDirect(videoItem.uri)
             if (history != null) {
                 val resumePos = calculateResumePosition(

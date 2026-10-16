@@ -154,4 +154,35 @@ class MediaRepositoryTest {
         job.cancelAndJoin()
         // ContentObserver registered and cleanly unregistered in awaitClose without leaking or throwing
     }
+
+    @Test
+    fun testDistinctBucketIdsAreSeparatedInFolders() = runBlocking {
+        val permission = PermissionUtils.getRequiredVideoPermission()
+        shadowOf(application).grantPermissions(permission)
+
+        val contentResolver = context.contentResolver
+
+        val video1 = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "trip1.mp4")
+            put(MediaStore.Video.Media.TITLE, "Trip 1")
+            put(MediaStore.Video.Media.SIZE, 1024L)
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/")
+        }
+        val video2 = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "trip2.mp4")
+            put(MediaStore.Video.Media.TITLE, "Trip 2")
+            put(MediaStore.Video.Media.SIZE, 2048L)
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "DCIM/")
+        }
+
+        contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video1)
+        contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, video2)
+
+        val folders = repository.getVideoFolders()
+        assertTrue(folders.any { it.name == "Movies" })
+        assertTrue(folders.any { it.name == "DCIM" })
+        assertEquals("Distinct folders should produce separate folder items", 2, folders.size)
+    }
 }

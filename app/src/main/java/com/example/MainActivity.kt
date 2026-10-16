@@ -23,6 +23,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
+import android.text.TextUtils
+import android.view.View
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import com.example.core.model.AppLanguage
+import com.example.core.model.AppSettings
+import com.example.data.repository.AppSettingsRepositoryImpl
+import com.example.ui.settings.SettingsScreen
+import java.util.Locale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,6 +48,12 @@ import com.example.ui.player.PipHelper
 import com.example.ui.player.PlayerScreen
 import com.example.ui.theme.MyApplicationTheme
 
+enum class ScreenState {
+  LIBRARY,
+  PLAYER,
+  SETTINGS
+}
+
 class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,8 +64,41 @@ class MainActivity : ComponentActivity() {
         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
     }
     setContent {
-      MyApplicationTheme {
-        FoxPlayerHome()
+      val context = LocalContext.current
+      val settingsRepository = remember { AppSettingsRepositoryImpl.getInstance(context) }
+      val settings by settingsRepository.appSettingsFlow.collectAsState(initial = AppSettings())
+
+      val localizedContext = remember(context, settings.language) {
+        if (settings.language == AppLanguage.SYSTEM) {
+          context
+        } else {
+          val locale = Locale(settings.language.code)
+          val config = Configuration(context.resources.configuration)
+          config.setLocale(locale)
+          config.setLayoutDirection(locale)
+          context.createConfigurationContext(config)
+        }
+      }
+
+      val layoutDirection = when (settings.language) {
+        AppLanguage.ARABIC -> LayoutDirection.Rtl
+        AppLanguage.ENGLISH -> LayoutDirection.Ltr
+        AppLanguage.SYSTEM -> {
+          if (TextUtils.getLayoutDirectionFromLocale(Locale.getDefault()) == View.LAYOUT_DIRECTION_RTL) {
+            LayoutDirection.Rtl
+          } else {
+            LayoutDirection.Ltr
+          }
+        }
+      }
+
+      CompositionLocalProvider(
+        LocalContext provides localizedContext,
+        LocalLayoutDirection provides layoutDirection
+      ) {
+        MyApplicationTheme(appTheme = settings.theme) {
+          FoxPlayerHome()
+        }
       }
     }
   }
@@ -71,23 +124,45 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FoxPlayerHome(modifier: Modifier = Modifier) {
   val context = LocalContext.current
-  var isPlayerOpen by rememberSaveable { mutableStateOf(false) }
+  var currentScreen by rememberSaveable { mutableStateOf(ScreenState.LIBRARY) }
 
-  if (isPlayerOpen) {
-    PlayerScreen(
-      modifier = modifier,
-      onBack = {
-        isPlayerOpen = false
+  when (currentScreen) {
+    ScreenState.LIBRARY -> {
+      VideoLibraryScreen(
+        modifier = modifier,
+        onVideoClick = { videoItem ->
+          PlaybackService.startPlayback(context, videoItem)
+          currentScreen = ScreenState.PLAYER
+        },
+        onSettingsClick = {
+          currentScreen = ScreenState.SETTINGS
+        }
+      )
+    }
+
+    ScreenState.PLAYER -> {
+      BackHandler {
+        currentScreen = ScreenState.LIBRARY
       }
-    )
-  } else {
-    VideoLibraryScreen(
-      modifier = modifier,
-      onVideoClick = { videoItem ->
-        PlaybackService.startPlayback(context, videoItem)
-        isPlayerOpen = true
+      PlayerScreen(
+        modifier = modifier,
+        onBack = {
+          currentScreen = ScreenState.LIBRARY
+        }
+      )
+    }
+
+    ScreenState.SETTINGS -> {
+      BackHandler {
+        currentScreen = ScreenState.LIBRARY
       }
-    )
+      SettingsScreen(
+        modifier = modifier,
+        onBack = {
+          currentScreen = ScreenState.LIBRARY
+        }
+      )
+    }
   }
 }
 

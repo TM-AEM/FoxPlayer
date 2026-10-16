@@ -69,6 +69,12 @@ class ThumbnailEngineImpl(
         return memoryCache.get(cacheKey)
     }
 
+    @androidx.annotation.VisibleForTesting
+    fun putThumbnailInCache(uri: String, bitmap: Bitmap, width: Int = 320, height: Int = 180) {
+        val cacheKey = buildCacheKey(uri, width, height)
+        memoryCache.put(cacheKey, bitmap)
+    }
+
     override suspend fun loadThumbnail(uri: String, width: Int, height: Int): Bitmap? {
         val cacheKey = buildCacheKey(uri, width, height)
 
@@ -178,7 +184,7 @@ class ThumbnailEngineImpl(
     }
 
     override fun getCacheCount(): Int {
-        return memoryCache.size()
+        return memoryCache.snapshot().size
     }
 
     private fun buildCacheKey(uri: String, width: Int, height: Int): String {

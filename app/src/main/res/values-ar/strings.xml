@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name">فوكس بلاير</string>
+
+    <!-- General & Navigation -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_general_section">عام</string>
+    <string name="settings_language_title">اللغة</string>
+    <string name="settings_language_system">لغة النظام</string>
+    <string name="settings_language_arabic">العربية (Arabic)</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_theme_title">المظهر</string>
+    <string name="settings_theme_system">تلقائي حسب النظام</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+    <string name="settings_playback_section">التشغيل</string>
+    <string name="settings_resume_playback_title">استئناف التشغيل</string>
+    <string name="settings_resume_playback_desc">متابعة تشغيل الفيديو من آخر موضع تم التوقف عنده</string>
+    <string name="settings_about_section">حول التطبيق</string>
+    <string name="settings_version">الإصدار 1.0</string>
+    <string name="settings_privacy_note">جميع عمليات فهرسة وتشغيل الفيديوهات وسجل المشاهدة تظل محلية بالكامل على جهازك.</string>
+
+    <!-- Video Library -->
+    <string name="library_title">الفيديوهات</string>
+    <string name="library_search_hint">ابحث عن فيديو…</string>
+    <string name="library_clear_search">مسح البحث</string>
+    <string name="library_close_search">إغلاق البحث</string>
+    <string name="library_sort_options">خيارات الفرز</string>
+    <string name="library_sort_newest">الأحدث أولاً</string>
+    <string name="library_sort_oldest">الأقدم أولاً</string>
+    <string name="library_sort_name">الاسم (أ-ي)</string>
+    <string name="library_sort_duration">الأطول مدة</string>
+    <string name="library_sort_size">الأكبر حجماً</string>
+    <string name="library_empty_title">لا توجد فيديوهات</string>
+    <string name="library_empty_desc">أضف مقاطع فيديو إلى مساحة تخزين جهازك لبدء المشاهدة</string>
+    <string name="library_permission_title">يلزم إذن الوصول للفيديوهات</string>
+    <string name="library_permission_desc">يحتاج فوكس بلاير إلى إذن الوصول للوسائط لعرض وتشغيل فيديوهاتك.</string>
+    <string name="library_grant_permission">منح الإذن</string>
+    <string name="library_refresh">تحديث</string>
+    <string name="library_retry">إعادة المحاولة</string>
+    <string name="library_error_title">تعذر تحميل مكتبة الفيديوهات</string>
+    <string name="library_no_matching_videos">لا توجد نتائج مطابقة</string>
+    <string name="library_try_different_search">جرب كلمة بحث أخرى</string>
+    <string name="library_scanning">جارٍ فحص الفيديوهات…</string>
+    <string name="library_resume_prefix">استئناف</string>
+    <string name="player_close_settings">إغلاق الإعدادات</string>
+    <string name="player_auto_audio">تلقائي (الافتراضي)</string>
+    <string name="player_auto_audio_desc">تحديد أفضل مسار صوت تلقائياً</string>
+    <string name="player_no_audio_tracks">لا توجد مسارات صوت إضافية</string>
+
+    <!-- Player Controls -->
+    <string name="player_back">رجوع</string>
+    <string name="player_play">تشغيل</string>
+    <string name="player_pause">إيقاف مؤقت</string>
+    <string name="player_pip">صورة داخل صورة</string>
+    <string name="player_settings">إعدادات التشغيل</string>
+    <string name="player_speed">سرعة التشغيل</string>
+    <string name="player_audio_track">مسار الصوت</string>
+    <string name="player_subtitles">الترجمة</string>
+    <string name="player_aspect_ratio">نسبة العرض</string>
+    <string name="player_gestures">الإيماءات</string>
+    <string name="player_track_default">الافتراضي</string>
+    <string name="player_track_off">معطل</string>
+    <string name="player_default_video_title">فيديو</string>
+</resources>

@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import com.example.core.model.AppTheme
 
 private val DarkColorScheme =
   darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
@@ -32,19 +33,26 @@ private val LightColorScheme =
 
 @Composable
 fun MyApplicationTheme(
+  appTheme: AppTheme = AppTheme.SYSTEM,
   darkTheme: Boolean = isSystemInDarkTheme(),
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = true,
   content: @Composable () -> Unit,
 ) {
+  val isDark = when (appTheme) {
+    AppTheme.SYSTEM -> darkTheme
+    AppTheme.LIGHT -> false
+    AppTheme.DARK -> true
+  }
+
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
 
-      darkTheme -> DarkColorScheme
+      isDark -> DarkColorScheme
       else -> LightColorScheme
     }
 

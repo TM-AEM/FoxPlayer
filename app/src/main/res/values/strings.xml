@@ -1,3 +1,64 @@
 <resources>
     <string name="app_name">FoxPlayer</string>
+
+    <!-- General & Navigation -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_general_section">General</string>
+    <string name="settings_language_title">Language</string>
+    <string name="settings_language_system">System Default</string>
+    <string name="settings_language_arabic">العربية (Arabic)</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_system">Follow System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_playback_section">Playback</string>
+    <string name="settings_resume_playback_title">Resume Playback</string>
+    <string name="settings_resume_playback_desc">Continue video from last watched position</string>
+    <string name="settings_about_section">About</string>
+    <string name="settings_version">Version 1.0</string>
+    <string name="settings_privacy_note">All video indexing, metadata, and history remain strictly on your device.</string>
+
+    <!-- Video Library -->
+    <string name="library_title">Videos</string>
+    <string name="library_search_hint">Search videos…</string>
+    <string name="library_clear_search">Clear Search</string>
+    <string name="library_close_search">Close Search</string>
+    <string name="library_sort_options">Sort Options</string>
+    <string name="library_sort_newest">Newest First</string>
+    <string name="library_sort_oldest">Oldest First</string>
+    <string name="library_sort_name">Name (A-Z)</string>
+    <string name="library_sort_duration">Longest First</string>
+    <string name="library_sort_size">Largest First</string>
+    <string name="library_empty_title">No videos found</string>
+    <string name="library_empty_desc">Add video files to your device storage to start watching</string>
+    <string name="library_permission_title">Storage Permission Required</string>
+    <string name="library_permission_desc">FoxPlayer needs access to your local media to display and play videos.</string>
+    <string name="library_grant_permission">Grant Permission</string>
+    <string name="library_refresh">Refresh</string>
+    <string name="library_retry">Retry</string>
+    <string name="library_error_title">Failed to load media library</string>
+    <string name="library_no_matching_videos">No matching videos</string>
+    <string name="library_try_different_search">Try a different search keyword</string>
+    <string name="library_scanning">Scanning videos…</string>
+    <string name="library_resume_prefix">Resume</string>
+    <string name="player_close_settings">Close settings</string>
+    <string name="player_auto_audio">Auto (System Default)</string>
+    <string name="player_auto_audio_desc">Automatically selects best audio stream</string>
+    <string name="player_no_audio_tracks">No additional audio tracks found</string>
+
+    <!-- Player Controls -->
+    <string name="player_back">Back</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_pip">Picture-in-Picture</string>
+    <string name="player_settings">Playback Settings</string>
+    <string name="player_speed">Playback Speed</string>
+    <string name="player_audio_track">Audio Track</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_aspect_ratio">Aspect Ratio</string>
+    <string name="player_gestures">Gestures</string>
+    <string name="player_track_default">Default</string>
+    <string name="player_track_off">Off</string>
+    <string name="player_default_video_title">Video</string>
 </resources>
