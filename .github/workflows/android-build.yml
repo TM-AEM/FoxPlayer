@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build & Test Debug APK
+    name: Build & Test Android APKs
     runs-on: ubuntu-latest
 
     steps:
@@ -44,3 +44,82 @@ jobs:
           name: FoxPlayer-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Generate temporary release keystore
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          KEYSTORE_FILE="${{ runner.temp }}/test-release.jks"
+          TEMP_PASS=$(openssl rand -hex 24)
+          echo "::add-mask::$TEMP_PASS"
+          echo "TEST_KEYSTORE_PATH=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+          echo "TEST_KEYSTORE_PASS=$TEMP_PASS" >> "$GITHUB_ENV"
+          keytool -genkeypair -v \
+            -keystore "$KEYSTORE_FILE" \
+            -storepass "$TEMP_PASS" \
+            -alias "upload" \
+            -keypass "$TEMP_PASS" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Test Release,O=FoxPlayer,C=US"
+
+          if [ ! -s "$KEYSTORE_FILE" ]; then
+            echo "::error::Keystore was not created or is empty at $KEYSTORE_FILE"
+            exit 1
+          fi
+
+      - name: Build minified Release APK
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          : "${TEST_KEYSTORE_PATH:?TEST_KEYSTORE_PATH is missing}"
+          : "${TEST_KEYSTORE_PASS:?TEST_KEYSTORE_PASS is missing}"
+
+          KEYSTORE_PATH="$TEST_KEYSTORE_PATH" \
+          STORE_PASSWORD="$TEST_KEYSTORE_PASS" \
+          KEY_PASSWORD="$TEST_KEYSTORE_PASS" \
+          ./gradlew :app:assembleRelease
+
+      - name: Verify Release APK and signature
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -s "$APK_PATH" ]; then
+            echo "::error::Release APK not found or empty at $APK_PATH"
+            exit 1
+          fi
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          APKSIGNER_BIN=""
+          if [ -n "$SDK_ROOT" ] && [ -d "$SDK_ROOT/build-tools" ]; then
+            APKSIGNER_BIN=$(find "$SDK_ROOT/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -n 1)
+          fi
+
+          if [ -z "$APKSIGNER_BIN" ] || [ ! -x "$APKSIGNER_BIN" ]; then
+            if command -v apksigner >/dev/null 2>&1; then
+              APKSIGNER_BIN=$(command -v apksigner)
+            else
+              echo "::error::apksigner executable not found in Android SDK build-tools or PATH"
+              exit 1
+            fi
+          fi
+
+          echo "Using apksigner: $APKSIGNER_BIN"
+          "$APKSIGNER_BIN" verify --verbose "$APK_PATH"
+
+      - name: Upload Release APK
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoxPlayer-release-manual-test-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Clean up temporary release keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/test-release.jks" "${{ runner.temp }}/temp-release.jks"
+
+
