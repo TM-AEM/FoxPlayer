@@ -57,11 +57,16 @@ class MainActivity : ComponentActivity() {
         if (settings.language == AppLanguage.SYSTEM) {
           context
         } else {
-          val locale = Locale(settings.language.code)
+          val locale = Locale.forLanguageTag(settings.language.code)
           val config = Configuration(context.resources.configuration)
           config.setLocale(locale)
           config.setLayoutDirection(locale)
-          context.createConfigurationContext(config)
+          val confContext = context.createConfigurationContext(config)
+          object : android.content.ContextWrapper(this@MainActivity) {
+            override fun getResources(): android.content.res.Resources {
+              return confContext.resources
+            }
+          }
         }
       }
 
@@ -116,8 +121,10 @@ fun FoxPlayerHome(modifier: Modifier = Modifier) {
       VideoLibraryScreen(
         modifier = modifier,
         onVideoClick = { videoItem ->
-          PlaybackService.startPlayback(context, videoItem)
-          currentScreen = ScreenState.PLAYER
+          val started = PlaybackService.startPlayback(context, videoItem)
+          if (started) {
+            currentScreen = ScreenState.PLAYER
+          }
         },
         onSettingsClick = {
           currentScreen = ScreenState.SETTINGS

@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 /**
  * Sort options for the video library.
  */
-enum class VideoSortOption(@StringRes val displayNameResId: Int) {
+enum class VideoSortOption(@get:StringRes val displayNameResId: Int) {
     DATE_DESC(R.string.library_sort_newest),
     DATE_ASC(R.string.library_sort_oldest),
     NAME_ASC(R.string.library_sort_name),

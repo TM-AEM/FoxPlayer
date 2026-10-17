@@ -17,7 +17,7 @@ import java.util.Locale
 /**
  * Aspect ratio / video resize modes mapped to screen surface scaling logic.
  */
-enum class ResizeMode(@StringRes val labelResId: Int) {
+enum class ResizeMode(@get:StringRes val labelResId: Int) {
     FIT(R.string.player_aspect_fit),
     FILL(R.string.player_aspect_fill),
     ZOOM(R.string.player_aspect_zoom)

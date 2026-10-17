@@ -198,6 +198,11 @@ class PlayerGestureTest {
         val max = controller.maxVolume
         val expectedPercent = ((5.0f / max.toFloat()) * 100f).roundToInt()
         org.junit.Assert.assertEquals(expectedPercent, controller.currentVolumePercent)
+
+        val updatedPercent = controller.adjustVolume(0.2f)
+        val newVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        val expectedNewPercent = ((newVolume.toFloat() / max.toFloat()) * 100f).roundToInt()
+        org.junit.Assert.assertEquals(expectedNewPercent, updatedPercent)
     }
 
     @Test

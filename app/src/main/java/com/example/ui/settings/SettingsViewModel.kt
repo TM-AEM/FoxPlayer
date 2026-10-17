@@ -18,42 +18,35 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel managing global application preferences state and mutation.
  */
-class SettingsViewModel @JvmOverloads constructor(
+class SettingsViewModel(
     application: Application,
-    private val settingsRepository: AppSettingsRepository = AppSettingsRepositoryImpl.getInstance(application)
+    private val settingsRepository: AppSettingsRepository = AppSettingsRepositoryImpl.getInstance(application),
+    scope: kotlinx.coroutines.CoroutineScope? = null
 ) : AndroidViewModel(application) {
 
-    private val coroutineScope = viewModelScope
-
-    constructor(
-        application: Application,
-        settingsRepository: AppSettingsRepository,
-        scope: kotlinx.coroutines.CoroutineScope
-    ) : this(application, settingsRepository) {
-        // Custom scope constructor
-    }
+    private val effectiveScope: kotlinx.coroutines.CoroutineScope = scope ?: viewModelScope
 
     val uiState: StateFlow<AppSettings> = settingsRepository.appSettingsFlow
         .stateIn(
-            scope = coroutineScope,
+            scope = effectiveScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = AppSettings()
         )
 
     fun onLanguageSelected(language: AppLanguage) {
-        viewModelScope.launch {
+        effectiveScope.launch {
             settingsRepository.updateLanguage(language)
         }
     }
 
     fun onThemeSelected(theme: AppTheme) {
-        viewModelScope.launch {
+        effectiveScope.launch {
             settingsRepository.updateTheme(theme)
         }
     }
 
     fun onResumePlaybackToggled(resume: Boolean) {
-        viewModelScope.launch {
+        effectiveScope.launch {
             settingsRepository.updateResumePlayback(resume)
         }
     }

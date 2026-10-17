@@ -6,7 +6,7 @@ import com.example.R
 /**
  * Supported application languages.
  */
-enum class AppLanguage(val code: String, @StringRes val displayNameResId: Int) {
+enum class AppLanguage(val code: String, @get:StringRes val displayNameResId: Int) {
     SYSTEM("", R.string.settings_language_system),
     ARABIC("ar", R.string.settings_language_arabic),
     ENGLISH("en", R.string.settings_language_english);
@@ -25,7 +25,7 @@ enum class AppLanguage(val code: String, @StringRes val displayNameResId: Int) {
 /**
  * Supported application themes.
  */
-enum class AppTheme(@StringRes val displayNameResId: Int) {
+enum class AppTheme(@get:StringRes val displayNameResId: Int) {
     SYSTEM(R.string.settings_theme_system),
     LIGHT(R.string.settings_theme_light),
     DARK(R.string.settings_theme_dark);

@@ -53,6 +53,18 @@ class MediaRepositoryTest {
     }
 
     @Test
+    fun testPartialMediaPermissionGrantsAccess() {
+        shadowOf(application).denyPermissions(
+            "android.permission.READ_MEDIA_VIDEO",
+            "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+        )
+        assertFalse(PermissionUtils.hasVideoPermission(context))
+
+        shadowOf(application).grantPermissions("android.permission.READ_MEDIA_VISUAL_USER_SELECTED")
+        assertTrue(PermissionUtils.hasVideoPermission(context))
+    }
+
+    @Test
     fun testEmptyListWhenPermissionDenied() = runBlocking {
         shadowOf(application).denyPermissions(PermissionUtils.getRequiredVideoPermission())
 

@@ -41,7 +41,7 @@ class PlaybackService : MediaSessionService() {
         var currentSessionToken: SessionToken? = null
             internal set
 
-        fun startPlayback(context: Context, videoItem: VideoItem) {
+        fun startPlayback(context: Context, videoItem: VideoItem): Boolean {
             val intent = Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_PLAY_VIDEO
                 putExtra(EXTRA_VIDEO_URI, videoItem.uri)
@@ -51,12 +51,17 @@ class PlaybackService : MediaSessionService() {
                 putExtra(EXTRA_VIDEO_DURATION, videoItem.durationMs)
                 putExtra(EXTRA_VIDEO_SIZE, videoItem.sizeBytes)
             }
-            try {
+            return try {
                 ContextCompat.startForegroundService(context, intent)
+                true
             } catch (e: Exception) {
                 try {
                     context.startService(intent)
-                } catch (_: Exception) {}
+                    true
+                } catch (e2: Exception) {
+                    android.util.Log.e("PlaybackService", "Failed to start PlaybackService", e2)
+                    false
+                }
             }
         }
     }

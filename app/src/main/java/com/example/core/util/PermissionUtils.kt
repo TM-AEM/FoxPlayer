@@ -26,6 +26,27 @@ object PermissionUtils {
     }
 
     /**
+     * Returns an array of permission strings to request based on Android OS version:
+     * - Android 14+ (API 34+): Both READ_MEDIA_VIDEO and READ_MEDIA_VISUAL_USER_SELECTED
+     * - Android 13 (API 33): READ_MEDIA_VIDEO
+     * - Android 12 and below (API <= 32): READ_EXTERNAL_STORAGE
+     */
+    fun getRequiredVideoPermissions(): Array<String> {
+        return when {
+            Build.VERSION.SDK_INT >= 34 -> arrayOf(
+                Manifest.permission.READ_MEDIA_VIDEO,
+                "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> arrayOf(
+                Manifest.permission.READ_MEDIA_VIDEO
+            )
+            else -> arrayOf(
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+        }
+    }
+
+    /**
      * Checks whether the application has been granted permission to read local video media.
      */
     fun hasVideoPermission(context: Context): Boolean {

@@ -48,11 +48,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -78,11 +83,27 @@ fun VideoLibraryScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
 
-    // Launcher for Android runtime storage permission
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Observe ON_RESUME to reload if permissions or media changed in background/system settings
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.checkPermissionAndLoad()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Launcher for Android runtime storage permissions (including partial media access on Android 14+)
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        viewModel.onPermissionResult(isGranted)
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        viewModel.onPermissionResult(PermissionUtils.hasVideoPermission(context))
     }
 
     Scaffold(
@@ -212,7 +233,7 @@ fun VideoLibraryScreen(
                 !uiState.isPermissionGranted -> {
                     PermissionDeniedView(
                         onRequestPermission = {
-                            permissionLauncher.launch(PermissionUtils.getRequiredVideoPermission())
+                            permissionLauncher.launch(PermissionUtils.getRequiredVideoPermissions())
                         }
                     )
                 }

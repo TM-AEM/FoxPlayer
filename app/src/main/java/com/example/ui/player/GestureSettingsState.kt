@@ -13,7 +13,7 @@ import com.example.R
  * A lower multiplier means higher threshold/lower sensitivity (smoother, more gradual changes).
  */
 enum class GestureSensitivity(
-    @StringRes val labelResId: Int,
+    @get:StringRes val labelResId: Int,
     val touchSlop: Float,
     val multiplier: Float
 ) {
@@ -45,7 +45,7 @@ enum class GestureSensitivity(
  */
 enum class DoubleTapSeekDuration(
     val seconds: Int,
-    @StringRes val labelResId: Int
+    @get:StringRes val labelResId: Int
 ) {
     FIVE(5, R.string.gesture_seek_5s),
     TEN(10, R.string.gesture_seek_10s),

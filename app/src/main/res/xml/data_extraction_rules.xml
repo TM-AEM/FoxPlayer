@@ -5,15 +5,12 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Exclude local Room database and history to enforce on-device privacy guarantee -->
+        <exclude domain="database" path="foxplayer.db"/>
+        <exclude domain="database" path="foxplayer.db-wal"/>
+        <exclude domain="database" path="foxplayer.db-shm"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="."/>
     </device-transfer>
-    -->
 </data-extraction-rules>
