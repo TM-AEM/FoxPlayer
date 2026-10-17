@@ -60,6 +60,34 @@ gradle :app:assembleRelease
 
 ---
 
+## 🔢 Versioning
+
+The app version is defined in exactly one place: the root-level **`version.properties`** file.
+
+```properties
+VERSION_NAME=1.0.0
+VERSION_CODE=2
+```
+
+- **`VERSION_NAME`** is user-facing and follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+- **`VERSION_CODE`** is the internal, strictly increasing positive integer required by Android and Google Play.
+
+`app/build.gradle.kts` reads this file at configuration time and fails the build with a clear error if the file is missing, either value is absent, `VERSION_CODE` is not a positive integer, or `VERSION_NAME` is blank.
+
+### Bumping the version
+
+| Change type | Rule | Example |
+| --- | --- | --- |
+| Bug fix | Increment `PATCH` | `1.0.0` → `1.0.1` |
+| Backward-compatible feature | Increment `MINOR`, reset `PATCH` | `1.0.1` → `1.1.0` |
+| Breaking product change | Increment `MAJOR`, reset `MINOR` and `PATCH` | `1.1.0` → `2.0.0` |
+
+**Every new release must also increment `VERSION_CODE`** to a positive integer that is greater than every version code previously published for `com.aistudio.foxplayer.vqxlyt`. Never reuse or decrease it — Google Play rejects a build whose version code has already been used, and a lower code cannot update an installed build.
+
+`VERSION_NAME` and `VERSION_CODE` are independent values. They are **not** derived from one another; bump both deliberately on each release.
+
+---
+
 ## 🔄 CI/CD & Automated Workflows
 
 The repository includes a hardened GitHub Actions workflow (`.github/workflows/android-build.yml`):
