@@ -16,7 +16,7 @@
     <string name="settings_resume_playback_title">Resume Playback</string>
     <string name="settings_resume_playback_desc">Continue video from last watched position</string>
     <string name="settings_about_section">About</string>
-    <string name="settings_version">Version 1.0</string>
+    <string name="settings_version">Version %s</string>
     <string name="settings_privacy_note">All video indexing, metadata, and history remain strictly on your device.</string>
 
     <!-- Video Library -->

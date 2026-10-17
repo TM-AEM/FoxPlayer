@@ -16,7 +16,7 @@
     <string name="settings_resume_playback_title">استئناف التشغيل</string>
     <string name="settings_resume_playback_desc">متابعة تشغيل الفيديو من آخر موضع تم التوقف عنده</string>
     <string name="settings_about_section">حول التطبيق</string>
-    <string name="settings_version">الإصدار 1.0</string>
+    <string name="settings_version">الإصدار %s</string>
     <string name="settings_privacy_note">جميع عمليات فهرسة وتشغيل الفيديوهات وسجل المشاهدة تظل محلية بالكامل على جهازك.</string>
 
     <!-- Video Library -->

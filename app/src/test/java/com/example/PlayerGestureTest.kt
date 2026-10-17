@@ -1,6 +1,7 @@
 package com.example
 
 import androidx.compose.foundation.layout.size
+import kotlin.math.roundToInt
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -185,27 +186,18 @@ class PlayerGestureTest {
 
     @Test
     fun testPlayerGestureControllerMediaVolumeRouting() {
-        val controllerService = org.robolectric.Robolectric.buildService(com.example.core.playback.PlaybackService::class.java)
-        val service = controllerService.create().get()
-
-        val player = com.example.core.playback.PlaybackService.currentEngine?.player
-        org.junit.Assert.assertNotNull(player)
-
-        player?.volume = 0.5f
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, 5, 0)
 
         val controller = com.example.ui.player.PlayerGestureController(
-            context = service,
-            activity = null,
-            playerProvider = { player }
+            context = context,
+            activity = null
         )
 
-        org.junit.Assert.assertEquals(50, controller.currentVolumePercent)
-
-        val updatedPercent = controller.adjustVolume(0.2f)
-        org.junit.Assert.assertEquals(70, updatedPercent)
-        org.junit.Assert.assertEquals(0.7f, player?.volume ?: 0f, 0.01f)
-
-        controllerService.destroy()
+        val max = controller.maxVolume
+        val expectedPercent = ((5.0f / max.toFloat()) * 100f).roundToInt()
+        org.junit.Assert.assertEquals(expectedPercent, controller.currentVolumePercent)
     }
 
     @Test

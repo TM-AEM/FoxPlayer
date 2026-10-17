@@ -29,10 +29,13 @@ object PermissionUtils {
      * Checks whether the application has been granted permission to read local video media.
      */
     fun hasVideoPermission(context: Context): Boolean {
-        val permission = getRequiredVideoPermission()
-        return ContextCompat.checkSelfPermission(
-            context,
-            permission
-        ) == PackageManager.PERMISSION_GRANTED
+        return if (Build.VERSION.SDK_INT >= 34) {
+            val hasVideo = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            val hasVisualSelected = ContextCompat.checkSelfPermission(context, "android.permission.READ_MEDIA_VISUAL_USER_SELECTED") == PackageManager.PERMISSION_GRANTED
+            hasVideo || hasVisualSelected
+        } else {
+            val permission = getRequiredVideoPermission()
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
     }
 }
