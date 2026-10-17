@@ -188,21 +188,38 @@ class PlayerGestureTest {
     fun testPlayerGestureControllerMediaVolumeRouting() {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-        audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, 5, 0)
+        val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        assertTrue("Max volume must be positive", max > 0)
+
+        // Set baseline to 5 steps
+        val initialSteps = 5.coerceAtMost(max)
+        audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, initialSteps, 0)
 
         val controller = com.example.ui.player.PlayerGestureController(
             context = context,
             activity = null
         )
 
-        val max = controller.maxVolume
-        val expectedPercent = ((5.0f / max.toFloat()) * 100f).roundToInt()
+        val expectedPercent = ((initialSteps.toFloat() / max.toFloat()) * 100f).roundToInt()
         org.junit.Assert.assertEquals(expectedPercent, controller.currentVolumePercent)
 
+        // Adjust +20%
+        val expectedTarget = (initialSteps + (0.2f * max)).roundToInt().coerceIn(0, max)
         val updatedPercent = controller.adjustVolume(0.2f)
         val newVolume = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
-        val expectedNewPercent = ((newVolume.toFloat() / max.toFloat()) * 100f).roundToInt()
+        org.junit.Assert.assertEquals("Actual system volume stream must match target step", expectedTarget, newVolume)
+        val expectedNewPercent = ((expectedTarget.toFloat() / max.toFloat()) * 100f).roundToInt()
         org.junit.Assert.assertEquals(expectedNewPercent, updatedPercent)
+
+        // Test upper clamp at max volume
+        controller.adjustVolume(2.0f)
+        org.junit.Assert.assertEquals(max, audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC))
+        org.junit.Assert.assertEquals(100, controller.currentVolumePercent)
+
+        // Test lower clamp at 0
+        controller.adjustVolume(-2.0f)
+        org.junit.Assert.assertEquals(0, audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC))
+        org.junit.Assert.assertEquals(0, controller.currentVolumePercent)
     }
 
     @Test

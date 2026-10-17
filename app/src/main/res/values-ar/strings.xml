@@ -113,4 +113,5 @@
     <string name="library_thumbnail_placeholder">صورة مصغرة للفيديو</string>
     <string name="library_unknown_error">حدث خطأ غير معروف</string>
     <string name="library_error_generic">تعذر تحميل الفيديوهات</string>
+    <string name="player_error_playback_start_failed">تعذر بدء تشغيل الفيديو. يرجى المحاولة مرة أخرى.</string>
 </resources>

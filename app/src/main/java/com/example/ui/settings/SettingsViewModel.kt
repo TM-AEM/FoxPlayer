@@ -1,6 +1,8 @@
 package com.example.ui.settings
 
 import android.app.Application
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -10,10 +12,12 @@ import com.example.core.model.AppSettings
 import com.example.core.model.AppTheme
 import com.example.data.repository.AppSettingsRepository
 import com.example.data.repository.AppSettingsRepositoryImpl
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * ViewModel managing global application preferences state and mutation.
@@ -36,6 +40,12 @@ class SettingsViewModel(
     fun onLanguageSelected(language: AppLanguage) {
         effectiveScope.launch {
             settingsRepository.updateLanguage(language)
+            val localeList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(language.code)
+            }
+            AppCompatDelegate.setApplicationLocales(localeList)
         }
     }
 

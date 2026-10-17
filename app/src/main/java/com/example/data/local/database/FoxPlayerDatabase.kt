@@ -23,7 +23,7 @@ import com.example.data.local.database.entity.PlaylistItemEntity
         PlaylistItemEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class FoxPlayerDatabase : RoomDatabase() {
 

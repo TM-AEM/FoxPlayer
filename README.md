@@ -39,14 +39,14 @@ FoxPlayer is a modern, privacy-first local video player for Android built with *
 
 ### Build Debug APK
 ```bash
-gradle :app:assembleDebug
+./gradlew :app:assembleDebug
 ```
 The output APK is generated at:
 `app/build/outputs/apk/debug/app-debug.apk`
 
 ### Run Unit & Robolectric Tests
 ```bash
-gradle :app:testDebugUnitTest
+./gradlew :app:testDebugUnitTest
 ```
 
 ### Build Minified Release APK
@@ -55,7 +55,7 @@ Release builds use R8 code shrinking and resource optimization:
 KEYSTORE_PATH="/path/to/keystore.jks" \
 STORE_PASSWORD="your-password" \
 KEY_PASSWORD="your-password" \
-gradle :app:assembleRelease
+./gradlew :app:assembleRelease
 ```
 
 ---

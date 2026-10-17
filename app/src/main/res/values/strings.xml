@@ -113,4 +113,5 @@
     <string name="library_thumbnail_placeholder">Video Thumbnail Placeholder</string>
     <string name="library_unknown_error">Unknown error occurred</string>
     <string name="library_error_generic">Failed to load videos</string>
+    <string name="player_error_playback_start_failed">Failed to start video playback. Please try again.</string>
 </resources>
