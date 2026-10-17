@@ -63,7 +63,7 @@ gradle :app:assembleRelease
 ## 🔄 CI/CD & Automated Workflows
 
 The repository includes a hardened GitHub Actions workflow (`.github/workflows/android-build.yml`):
-- **Automated Verification:** On every push and pull request to `main`, runs JDK 21 setup, executes all unit tests, builds the Debug APK, and uploads `FoxPlayer-debug-apk`.
+- **Automated Verification:** On every push and pull request to `main`, runs JDK 21 setup, executes all unit tests and verifies Compose screenshot tests against committed golden images (`:app:testDebugUnitTest :app:verifyRoborazziDebug`), runs Android Lint (`:app:lintDebug`), builds the Debug APK, and uploads `FoxPlayer-debug-apk`. Unit test reports, screenshot diff reports, and the lint HTML report are uploaded as artifacts to simplify diagnosing a broken build. The reference screenshots under `app/src/test/screenshots/` are declared as Gradle task inputs, so changing a golden invalidates the task and verification can never be silently skipped by the build cache.
 - **Manual Release Packaging:** On manual trigger (`workflow_dispatch`), safely generates an isolated temporary test keystore in `runner.temp`, builds a minified Release APK, verifies signature via `apksigner verify --verbose`, and uploads `FoxPlayer-release-manual-test-apk` for direct on-device testing.
 
 ---

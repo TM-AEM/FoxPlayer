@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.view.SurfaceView
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
+import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -45,8 +47,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.example.R
 import com.example.core.model.PlaybackState
 import com.example.core.model.PlaybackStatus
 import com.example.core.playback.PlaybackService
@@ -67,6 +71,7 @@ import kotlinx.coroutines.launch
  * - Leaves system bars in immersive sticky mode during playback and cleanly restores them on exit.
  * - Detaches the [SurfaceView] on exit WITHOUT stopping or releasing the background player.
  */
+@OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     modifier: Modifier = Modifier,
@@ -143,10 +148,11 @@ fun PlayerScreen(
     val playbackState by playbackStateFlow.collectAsState()
 
     // Title from MediaMetadata or PlaybackService engine
-    val videoTitle = remember(activePlayer?.currentMediaItem) {
+    val defaultVideoTitle = stringResource(R.string.player_default_video_title)
+    val videoTitle = remember(activePlayer?.currentMediaItem, defaultVideoTitle) {
         activePlayer?.currentMediaItem?.mediaMetadata?.title?.toString()
             ?: activePlayer?.mediaMetadata?.title?.toString()
-            ?: "Video"
+            ?: defaultVideoTitle
     }
 
     // Gesture Controller for Volume and Brightness
@@ -328,15 +334,15 @@ fun PlayerScreen(
     }
 
     // Memoized Audio & Subtitle track lists from actual Player tracks
-    val audioTracks = remember(currentTracks, currentTrackParameters) {
-        PlayerTrackHelper.getAudioTracks(currentTracks, currentTrackParameters)
+    val audioTracks = remember(currentTracks, currentTrackParameters, context) {
+        PlayerTrackHelper.getAudioTracks(context, currentTracks, currentTrackParameters)
     }
     val isAudioAuto = remember(currentTrackParameters) {
         PlayerTrackHelper.isAudioAuto(currentTrackParameters)
     }
 
-    val subtitleTracks = remember(currentTracks, currentTrackParameters) {
-        PlayerTrackHelper.getSubtitleTracks(currentTracks, currentTrackParameters)
+    val subtitleTracks = remember(currentTracks, currentTrackParameters, context) {
+        PlayerTrackHelper.getSubtitleTracks(context, currentTracks, currentTrackParameters)
     }
     val isSubtitleOff = remember(currentTrackParameters) {
         PlayerTrackHelper.isSubtitleOff(currentTrackParameters)

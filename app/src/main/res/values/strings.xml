@@ -60,5 +60,57 @@
     <string name="player_gestures">Gestures</string>
     <string name="player_track_default">Default</string>
     <string name="player_track_off">Off</string>
+    <string name="player_track_auto">Auto</string>
     <string name="player_default_video_title">Video</string>
+    <string name="player_no_subtitle_tracks">No embedded subtitle tracks found</string>
+    <string name="player_playback_speed_current">Playback Speed (Current: %1$sx)</string>
+    <string name="player_speed_value">%1$sx</string>
+    <string name="player_subtitle_off_desc">Disable subtitles</string>
+    <string name="player_subtitle_auto_desc">Show subtitles matching system language</string>
+    <string name="player_track_forced">Forced</string>
+    <string name="player_gesture_sensitivity_title">Gesture Sensitivity</string>
+    <string name="player_gesture_sensitivity_desc">Adjust the swipe distance threshold and response speed for vertical controls.</string>
+    <string name="player_gesture_volume_title">Volume Gesture (Right Side): %1$s</string>
+    <string name="player_gesture_brightness_title">Brightness Gesture (Left Side): %1$s</string>
+    <string name="player_double_tap_seek_title">Double-Tap Seek: %1$s</string>
+
+    <!-- Aspect Ratio Modes -->
+    <string name="player_aspect_fit">Fit</string>
+    <string name="player_aspect_fill">Fill</string>
+    <string name="player_aspect_zoom">Zoom</string>
+
+    <!-- Gesture Sensitivity Levels -->
+    <string name="gesture_sensitivity_low">Low</string>
+    <string name="gesture_sensitivity_medium">Medium</string>
+    <string name="gesture_sensitivity_high">High</string>
+
+    <!-- Double-Tap Seek Duration Labels -->
+    <string name="gesture_seek_5s">5s</string>
+    <string name="gesture_seek_10s">10s</string>
+    <string name="gesture_seek_15s">15s</string>
+    <string name="gesture_seek_30s">30s</string>
+
+    <!-- Gesture Feedback Overlay -->
+    <string name="gesture_feedback_volume">Volume</string>
+    <string name="gesture_feedback_brightness">Brightness</string>
+    <string name="gesture_feedback_speed_boost">2X Speed</string>
+    <string name="gesture_feedback_seek_forward">+%1$ds</string>
+    <string name="gesture_feedback_seek_backward">-%1$ds</string>
+    <string name="gesture_feedback_time_progress">%1$s / %2$s</string>
+    <string name="gesture_feedback_percent">%1$d%%</string>
+
+    <!-- Track Metadata -->
+    <string name="track_channels_mono">Mono (1 ch)</string>
+    <string name="track_channels_stereo">Stereo (2 ch)</string>
+    <string name="track_channels_surround_51">5.1 Surround (6 ch)</string>
+    <string name="track_channels_surround_71">7.1 Surround (8 ch)</string>
+    <string name="track_channels_generic">%1$d ch</string>
+    <string name="track_audio_default">Audio #%1$d</string>
+    <string name="track_subtitle_default">Subtitle #%1$d</string>
+
+    <!-- Library Metadata -->
+    <string name="library_default_folder">Videos</string>
+    <string name="library_thumbnail_placeholder">Video Thumbnail Placeholder</string>
+    <string name="library_unknown_error">Unknown error occurred</string>
+    <string name="library_error_generic">Failed to load videos</string>
 </resources>

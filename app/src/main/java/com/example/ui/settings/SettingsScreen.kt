@@ -182,7 +182,7 @@ fun SettingsScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "FoxPlayer",
+                            text = stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )

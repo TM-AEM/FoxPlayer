@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.example.R
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -95,15 +96,20 @@ fun GestureFeedbackOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
+                        val seekLabel = if (doubleTap.isForward) {
+                            stringResource(R.string.gesture_feedback_seek_forward, doubleTap.deltaSeconds)
+                        } else {
+                            stringResource(R.string.gesture_feedback_seek_backward, doubleTap.deltaSeconds)
+                        }
                         Icon(
                             painter = painterResource(id = if (doubleTap.isForward) R.drawable.ic_fast_forward else R.drawable.ic_fast_rewind),
-                            contentDescription = if (doubleTap.isForward) "+${doubleTap.deltaSeconds}s" else "-${doubleTap.deltaSeconds}s",
+                            contentDescription = seekLabel,
                             tint = Color.White,
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (doubleTap.isForward) "+${doubleTap.deltaSeconds}s" else "-${doubleTap.deltaSeconds}s",
+                            text = seekLabel,
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -134,17 +140,24 @@ fun GestureFeedbackOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        val sign = if (swipeSeek.deltaMs >= 0) "+" else "-"
                         val absDeltaSeconds = Math.abs(swipeSeek.deltaMs) / 1000L
                         Text(
-                            text = "$sign${absDeltaSeconds}s",
+                            text = if (swipeSeek.deltaMs >= 0) {
+                                stringResource(R.string.gesture_feedback_seek_forward, absDeltaSeconds)
+                            } else {
+                                stringResource(R.string.gesture_feedback_seek_backward, absDeltaSeconds)
+                            },
                             color = MaterialTheme.colorScheme.primary,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "${FormatUtils.formatDuration(swipeSeek.targetPositionMs)} / ${FormatUtils.formatDuration(swipeSeek.durationMs)}",
+                            text = stringResource(
+                                R.string.gesture_feedback_time_progress,
+                                FormatUtils.formatDuration(swipeSeek.targetPositionMs),
+                                FormatUtils.formatDuration(swipeSeek.durationMs)
+                            ),
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
@@ -164,7 +177,7 @@ fun GestureFeedbackOverlay(
             val vol = feedback as? GestureFeedback.Volume
             if (vol != null) {
                 LevelFeedbackCard(
-                    title = "Volume",
+                    title = stringResource(R.string.gesture_feedback_volume),
                     percent = vol.volumePercent,
                     testTag = "feedback_volume_indicator"
                 )
@@ -181,7 +194,7 @@ fun GestureFeedbackOverlay(
             val bright = feedback as? GestureFeedback.Brightness
             if (bright != null) {
                 LevelFeedbackCard(
-                    title = "Brightness",
+                    title = stringResource(R.string.gesture_feedback_brightness),
                     percent = bright.brightnessPercent,
                     testTag = "feedback_brightness_indicator"
                 )
@@ -213,12 +226,12 @@ fun GestureFeedbackOverlay(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_fast_forward),
-                            contentDescription = "2x Speed",
+                            contentDescription = stringResource(R.string.gesture_feedback_speed_boost),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "2X Speed",
+                            text = stringResource(R.string.gesture_feedback_speed_boost),
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
@@ -258,7 +271,7 @@ private fun LevelFeedbackCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "$percent%",
+                text = stringResource(R.string.gesture_feedback_percent, percent),
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold

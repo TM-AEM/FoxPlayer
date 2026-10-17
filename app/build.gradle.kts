@@ -74,6 +74,17 @@ secrets {
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
+// Reference screenshots are read by the screenshot tests but are not otherwise
+// declared as task inputs. Without this, changing a golden image does not
+// invalidate the up-to-date check or the build cache, so Roborazzi verification
+// could be skipped and a regression would slip through. Declaring the directory
+// as an input guarantees the verify task re-runs whenever a golden changes.
+tasks.withType<Test>().configureEach {
+  inputs.dir(layout.projectDirectory.dir("src/test/screenshots"))
+    .withPropertyName("roborazziReferenceImages")
+    .optional()
+}
+
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {

@@ -18,6 +18,7 @@ import com.example.core.model.VideoItem
 import com.example.data.local.database.FoxPlayerDatabase
 import com.example.data.local.database.dao.HistoryDao
 import com.example.data.local.database.entity.PlaybackHistoryEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,7 @@ class FoxPlayerEngine(
 
     private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
     private val historyScope = CoroutineScope(SupervisorJob() + ioDispatcher)
+    private val appContext = context.applicationContext
     private val historyMutex = Mutex()
     private var progressJob: Job? = null
     private var resumeJob: Job? = null
@@ -168,15 +170,13 @@ class FoxPlayerEngine(
         // Asynchronously check history to resume position without blocking UI
         resumeJob?.cancel()
         resumeJob = scope.launch(ioDispatcher) {
-            val shouldResume = try {
-                appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
-            } catch (_: Throwable) {
-                true
-            }
-            if (!shouldResume) return@launch
+            // Best-effort resume: any failure (e.g. the database being closed while
+            // this runs during shutdown) must not surface as an uncaught exception.
+            try {
+                val shouldResume = appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
+                if (!shouldResume) return@launch
 
-            val history = historyDao?.getHistoryByUriDirect(uriString)
-            if (history != null) {
+                val history = historyDao?.getHistoryByUriDirect(uriString) ?: return@launch
                 val resumePos = calculateResumePosition(history.lastPositionMs, history.durationMs)
                 if (resumePos > 0L) {
                     withContext(mainDispatcher) {
@@ -186,6 +186,10 @@ class FoxPlayerEngine(
                         }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Ignore: resume is best-effort and must never crash playback or tests.
             }
         }
     }
@@ -210,15 +214,13 @@ class FoxPlayerEngine(
         // Asynchronously check history to resume position without blocking UI
         resumeJob?.cancel()
         resumeJob = scope.launch(ioDispatcher) {
-            val shouldResume = try {
-                appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
-            } catch (_: Throwable) {
-                true
-            }
-            if (!shouldResume) return@launch
+            // Best-effort resume: any failure (e.g. the database being closed while
+            // this runs during shutdown) must not surface as an uncaught exception.
+            try {
+                val shouldResume = appSettingsRepository?.appSettingsFlow?.firstOrNull()?.resumePlayback ?: true
+                if (!shouldResume) return@launch
 
-            val history = historyDao?.getHistoryByUriDirect(videoItem.uri)
-            if (history != null) {
+                val history = historyDao?.getHistoryByUriDirect(videoItem.uri) ?: return@launch
                 val resumePos = calculateResumePosition(
                     history.lastPositionMs,
                     history.durationMs.takeIf { it > 0 } ?: videoItem.durationMs
@@ -231,6 +233,10 @@ class FoxPlayerEngine(
                         }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Ignore: resume is best-effort and must never crash playback or tests.
             }
         }
     }
@@ -332,7 +338,7 @@ class FoxPlayerEngine(
             ?: return null
         val title = currentItem?.title?.ifBlank { currentItem.displayName }
             ?: exoPlayer.currentMediaItem?.mediaMetadata?.title?.toString()
-            ?: "Video"
+            ?: appContext.getString(com.example.R.string.player_default_video_title)
 
         val safeDuration = if (durationMs > 0) durationMs else (currentItem?.durationMs ?: 0L)
         val percentage = if (isEnded) {

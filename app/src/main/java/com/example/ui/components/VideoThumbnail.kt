@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.example.R
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +82,7 @@ fun VideoThumbnail(
             // Elegant placeholder
             Icon(
                 painter = painterResource(id = R.drawable.ic_movie),
-                contentDescription = contentDescription ?: "Video Thumbnail Placeholder",
+                contentDescription = contentDescription ?: stringResource(R.string.library_thumbnail_placeholder),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier
                     .size(36.dp)

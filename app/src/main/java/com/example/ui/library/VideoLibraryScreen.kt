@@ -169,7 +169,7 @@ fun VideoLibraryScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = option.displayName,
+                                            text = stringResource(option.displayNameResId),
                                             fontWeight = if (uiState.sortOption == option) FontWeight.Bold else FontWeight.Normal,
                                             color = if (uiState.sortOption == option) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                         )
@@ -225,7 +225,7 @@ fun VideoLibraryScreen(
                 // 3. Error State
                 uiState.errorMessage != null -> {
                     ErrorView(
-                        message = uiState.errorMessage ?: "Unknown error occurred",
+                        message = uiState.errorMessage ?: stringResource(R.string.library_unknown_error),
                         onRetry = { viewModel.refresh() }
                     )
                 }
@@ -341,7 +341,7 @@ private fun VideoCardItem(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     // Folder & Resolution label
-                    val folderLabel = video.bucketName.ifBlank { "Videos" }
+                    val folderLabel = video.bucketName.ifBlank { stringResource(R.string.library_default_folder) }
                     val resolutionLabel = if (video.width > 0 && video.height > 0) {
                         "${video.width}x${video.height}"
                     } else null
@@ -365,6 +365,7 @@ private fun VideoCardItem(
                     Spacer(modifier = Modifier.height(2.dp))
 
                     // File size, date and resume position
+                    val resumePrefix = stringResource(R.string.library_resume_prefix)
                     val metaText = buildString {
                         append(FormatUtils.formatFileSize(video.sizeBytes))
                         val dateFormatted = FormatUtils.formatDate(video.dateModified)
@@ -373,7 +374,9 @@ private fun VideoCardItem(
                             append(dateFormatted)
                         }
                         if (history != null && history.lastPositionMs > 3000L && history.watchPercentage < 0.95f) {
-                            append(" • Resume ")
+                            append(" • ")
+                            append(resumePrefix)
+                            append(" ")
                             append(FormatUtils.formatDuration(history.lastPositionMs))
                         }
                     }

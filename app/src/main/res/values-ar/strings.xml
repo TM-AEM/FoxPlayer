@@ -60,5 +60,57 @@
     <string name="player_gestures">الإيماءات</string>
     <string name="player_track_default">الافتراضي</string>
     <string name="player_track_off">معطل</string>
+    <string name="player_track_auto">تلقائي</string>
     <string name="player_default_video_title">فيديو</string>
+    <string name="player_no_subtitle_tracks">لا توجد مسارات ترجمة مدمجة</string>
+    <string name="player_playback_speed_current">سرعة التشغيل (الحالية: %1$sx)</string>
+    <string name="player_speed_value">%1$sx</string>
+    <string name="player_subtitle_off_desc">تعطيل الترجمة</string>
+    <string name="player_subtitle_auto_desc">عرض الترجمة المطابقة للغة النظام</string>
+    <string name="player_track_forced">إجباري</string>
+    <string name="player_gesture_sensitivity_title">حساسية الإيماءات</string>
+    <string name="player_gesture_sensitivity_desc">اضبط مسافة السحب وسرعة الاستجابة لعناصر التحكم الرأسية.</string>
+    <string name="player_gesture_volume_title">إيماءة الصوت (الجانب الأيمن): %1$s</string>
+    <string name="player_gesture_brightness_title">إيماءة السطوع (الجانب الأيسر): %1$s</string>
+    <string name="player_double_tap_seek_title">النقر المزدوج للتنقل: %1$s</string>
+
+    <!-- Aspect Ratio Modes -->
+    <string name="player_aspect_fit">ملاءمة</string>
+    <string name="player_aspect_fill">تعبئة</string>
+    <string name="player_aspect_zoom">تكبير</string>
+
+    <!-- Gesture Sensitivity Levels -->
+    <string name="gesture_sensitivity_low">منخفضة</string>
+    <string name="gesture_sensitivity_medium">متوسطة</string>
+    <string name="gesture_sensitivity_high">عالية</string>
+
+    <!-- Double-Tap Seek Duration Labels -->
+    <string name="gesture_seek_5s">5 ث</string>
+    <string name="gesture_seek_10s">10 ث</string>
+    <string name="gesture_seek_15s">15 ث</string>
+    <string name="gesture_seek_30s">30 ث</string>
+
+    <!-- Gesture Feedback Overlay -->
+    <string name="gesture_feedback_volume">الصوت</string>
+    <string name="gesture_feedback_brightness">السطوع</string>
+    <string name="gesture_feedback_speed_boost">سرعة 2X</string>
+    <string name="gesture_feedback_seek_forward">+%1$d ث</string>
+    <string name="gesture_feedback_seek_backward">-%1$d ث</string>
+    <string name="gesture_feedback_time_progress">%1$s / %2$s</string>
+    <string name="gesture_feedback_percent">%1$d%%</string>
+
+    <!-- Track Metadata -->
+    <string name="track_channels_mono">أحادي (قناة واحدة)</string>
+    <string name="track_channels_stereo">ستيريو (قناتان)</string>
+    <string name="track_channels_surround_51">محيطي 5.1 (6 قنوات)</string>
+    <string name="track_channels_surround_71">محيطي 7.1 (8 قنوات)</string>
+    <string name="track_channels_generic">%1$d قنوات</string>
+    <string name="track_audio_default">مسار صوتي #%1$d</string>
+    <string name="track_subtitle_default">ترجمة #%1$d</string>
+
+    <!-- Library Metadata -->
+    <string name="library_default_folder">الفيديوهات</string>
+    <string name="library_thumbnail_placeholder">صورة مصغرة للفيديو</string>
+    <string name="library_unknown_error">حدث خطأ غير معروف</string>
+    <string name="library_error_generic">تعذر تحميل الفيديوهات</string>
 </resources>
