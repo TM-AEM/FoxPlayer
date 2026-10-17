@@ -46,10 +46,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
+
+/**
+ * Formats a playback speed value for display, trimming redundant trailing zeros
+ * (e.g. 1.0f -> "1", 1.50f -> "1.5") using a locale-stable format.
+ */
+private fun formatSpeed(speed: Float): String {
+    return String.format(java.util.Locale.US, "%.2f", speed).trimEnd('0').trimEnd('.')
+}
 
 /**
  * Modern Material 3 Player Settings Panel supporting:
@@ -129,7 +139,7 @@ fun PlayerSettingsPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Playback Settings",
+                            text = stringResource(R.string.player_settings),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -143,7 +153,7 @@ fun PlayerSettingsPanel(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Close settings",
+                                contentDescription = stringResource(R.string.player_close_settings),
                                 tint = Color.White.copy(alpha = 0.8f)
                             )
                         }
@@ -153,7 +163,7 @@ fun PlayerSettingsPanel(
 
                     // Section 1: Playback Speed
                     Text(
-                        text = "Playback Speed (Current: ${String.format(java.util.Locale.US, "%.2f", currentSpeed).trimEnd('0').trimEnd('.')}x)",
+                        text = stringResource(R.string.player_playback_speed_current, formatSpeed(currentSpeed)),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF90CAF9)
@@ -168,13 +178,14 @@ fun PlayerSettingsPanel(
                     ) {
                         PlayerTrackHelper.SUPPORTED_SPEEDS.forEach { speed ->
                             val isSelected = kotlin.math.abs(currentSpeed - speed) < 0.05f
-                            val speedTag = "speed_chip_${String.format(java.util.Locale.US, "%.2f", speed).trimEnd('0').trimEnd('.')}"
+                            val formattedSpeed = formatSpeed(speed)
+                            val speedTag = "speed_chip_$formattedSpeed"
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { onSpeedSelected(speed) },
                                 label = {
                                     Text(
-                                        text = "${String.format(java.util.Locale.US, "%.2f", speed).trimEnd('0').trimEnd('.')}x",
+                                        text = stringResource(R.string.player_speed_value, formattedSpeed),
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 },
@@ -204,7 +215,7 @@ fun PlayerSettingsPanel(
 
                     // Section 2: Aspect Ratio
                     Text(
-                        text = "Aspect Ratio",
+                        text = stringResource(R.string.player_aspect_ratio),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF90CAF9)
@@ -221,7 +232,7 @@ fun PlayerSettingsPanel(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { onResizeModeSelected(mode) },
-                                label = { Text(mode.label) },
+                                label = { Text(stringResource(mode.labelResId)) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -239,7 +250,7 @@ fun PlayerSettingsPanel(
 
                     // Section 3: Audio Tracks
                     Text(
-                        text = "Audio Track",
+                        text = stringResource(R.string.player_audio_track),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF90CAF9)
@@ -249,8 +260,8 @@ fun PlayerSettingsPanel(
 
                     // Auto Option for Audio
                     TrackSelectionRow(
-                        title = "Auto (System Default)",
-                        subtitle = if (isAudioAuto) "Automatically selects best audio stream" else null,
+                        title = stringResource(R.string.player_auto_audio),
+                        subtitle = if (isAudioAuto) stringResource(R.string.player_auto_audio_desc) else null,
                         isSelected = isAudioAuto,
                         onClick = { onAudioTrackSelected(null) },
                         testTag = "audio_track_auto"
@@ -258,7 +269,7 @@ fun PlayerSettingsPanel(
 
                     if (audioTracks.isEmpty()) {
                         Text(
-                            text = "No additional audio tracks found in stream",
+                            text = stringResource(R.string.player_no_audio_tracks),
                             style = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.5f)),
                             modifier = Modifier.padding(vertical = 4.dp, horizontal = 12.dp)
                         )
@@ -281,7 +292,7 @@ fun PlayerSettingsPanel(
 
                     // Section 4: Subtitles
                     Text(
-                        text = "Subtitles",
+                        text = stringResource(R.string.player_subtitles),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF90CAF9)
@@ -291,8 +302,8 @@ fun PlayerSettingsPanel(
 
                     // Off Option for Subtitles
                     TrackSelectionRow(
-                        title = "Off",
-                        subtitle = "Disable subtitles",
+                        title = stringResource(R.string.player_track_off),
+                        subtitle = stringResource(R.string.player_subtitle_off_desc),
                         isSelected = isSubtitleOff,
                         onClick = { onSubtitleModeSelected(SubtitleSelectionMode.Off) },
                         testTag = "subtitle_track_off"
@@ -300,8 +311,8 @@ fun PlayerSettingsPanel(
 
                     // Auto Option for Subtitles
                     TrackSelectionRow(
-                        title = "Auto",
-                        subtitle = "Show subtitles matching system language",
+                        title = stringResource(R.string.player_track_auto),
+                        subtitle = stringResource(R.string.player_subtitle_auto_desc),
                         isSelected = isSubtitleAuto,
                         onClick = { onSubtitleModeSelected(SubtitleSelectionMode.Auto) },
                         testTag = "subtitle_track_auto"
@@ -309,7 +320,7 @@ fun PlayerSettingsPanel(
 
                     if (subtitleTracks.isEmpty()) {
                         Text(
-                            text = "No embedded subtitle tracks found in stream",
+                            text = stringResource(R.string.player_no_subtitle_tracks),
                             style = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.5f)),
                             modifier = Modifier.padding(vertical = 4.dp, horizontal = 12.dp)
                         )
@@ -317,7 +328,7 @@ fun PlayerSettingsPanel(
                         subtitleTracks.forEach { track ->
                             val details = listOfNotNull(
                                 track.language,
-                                if (track.isForced) "Forced" else null
+                                if (track.isForced) stringResource(R.string.player_track_forced) else null
                             ).joinToString(" • ")
                             TrackSelectionRow(
                                 title = track.label,
@@ -335,7 +346,7 @@ fun PlayerSettingsPanel(
 
                     // Section 5: Gesture Sensitivity Thresholds
                     Text(
-                        text = "Gesture Sensitivity",
+                        text = stringResource(R.string.player_gesture_sensitivity_title),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF90CAF9)
@@ -344,7 +355,7 @@ fun PlayerSettingsPanel(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Adjust the swipe distance threshold and response speed for vertical controls.",
+                        text = stringResource(R.string.player_gesture_sensitivity_desc),
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = Color.White.copy(alpha = 0.6f),
                             fontSize = 12.sp
@@ -355,7 +366,10 @@ fun PlayerSettingsPanel(
 
                     // Volume Gesture Threshold Selector
                     Text(
-                        text = "Volume Gesture (Right Side): ${gestureSettings.volumeSensitivity.label}",
+                        text = stringResource(
+                            R.string.player_gesture_volume_title,
+                            stringResource(gestureSettings.volumeSensitivity.labelResId)
+                        ),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Medium,
                             color = Color.White
@@ -379,7 +393,7 @@ fun PlayerSettingsPanel(
                                         )
                                     }
                                 },
-                                label = { Text(sensitivity.label) },
+                                label = { Text(stringResource(sensitivity.labelResId)) },
                                 leadingIcon = if (isSelected) {
                                     {
                                         Icon(
@@ -404,7 +418,10 @@ fun PlayerSettingsPanel(
 
                     // Brightness Gesture Threshold Selector
                     Text(
-                        text = "Brightness Gesture (Left Side): ${gestureSettings.brightnessSensitivity.label}",
+                        text = stringResource(
+                            R.string.player_gesture_brightness_title,
+                            stringResource(gestureSettings.brightnessSensitivity.labelResId)
+                        ),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Medium,
                             color = Color.White
@@ -428,7 +445,7 @@ fun PlayerSettingsPanel(
                                         )
                                     }
                                 },
-                                label = { Text(sensitivity.label) },
+                                label = { Text(stringResource(sensitivity.labelResId)) },
                                 leadingIcon = if (isSelected) {
                                     {
                                         Icon(
@@ -453,7 +470,10 @@ fun PlayerSettingsPanel(
 
                     // Double-Tap Seek Duration Selector
                     Text(
-                        text = "Double-Tap Seek: ${gestureSettings.doubleTapSeekDuration.label}",
+                        text = stringResource(
+                            R.string.player_double_tap_seek_title,
+                            stringResource(gestureSettings.doubleTapSeekDuration.labelResId)
+                        ),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Medium,
                             color = Color.White
@@ -480,7 +500,7 @@ fun PlayerSettingsPanel(
                                         )
                                     }
                                 },
-                                label = { Text(duration.label) },
+                                label = { Text(stringResource(duration.labelResId)) },
                                 leadingIcon = if (isSelected) {
                                     {
                                         Icon(

@@ -32,8 +32,37 @@ jobs:
       - name: Generate debug keystore
         run: keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest
+      - name: Run unit tests and verify screenshot tests
+        run: ./gradlew :app:testDebugUnitTest :app:verifyRoborazziDebug
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest
+            app/build/test-results/testDebugUnitTest
+          if-no-files-found: ignore
+
+      - name: Upload screenshot diff reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-diff-reports
+          path: app/build/outputs/roborazzi
+          if-no-files-found: ignore
+
+      - name: Run Android Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
 
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug

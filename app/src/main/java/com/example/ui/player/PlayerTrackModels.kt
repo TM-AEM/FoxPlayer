@@ -1,5 +1,8 @@
 package com.example.ui.player
 
+import android.content.Context
+import androidx.annotation.OptIn
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -7,15 +10,17 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
+import com.example.R
 import java.util.Locale
 
 /**
  * Aspect ratio / video resize modes mapped to screen surface scaling logic.
  */
-enum class ResizeMode(val label: String) {
-    FIT("Fit"),
-    FILL("Fill"),
-    ZOOM("Zoom")
+enum class ResizeMode(@StringRes val labelResId: Int) {
+    FIT(R.string.player_aspect_fit),
+    FILL(R.string.player_aspect_fill),
+    ZOOM(R.string.player_aspect_zoom)
 }
 
 /**
@@ -58,6 +63,7 @@ sealed class SubtitleSelectionMode {
     data class Track(val track: SubtitleTrackItem) : SubtitleSelectionMode()
 }
 
+@OptIn(UnstableApi::class)
 object PlayerTrackHelper {
 
     val SUPPORTED_SPEEDS: List<Float> = listOf(
@@ -74,7 +80,7 @@ object PlayerTrackHelper {
         4.0f
     )
 
-    fun getAudioTracks(tracks: Tracks, parameters: TrackSelectionParameters): List<AudioTrackItem> {
+    fun getAudioTracks(context: Context, tracks: Tracks, parameters: TrackSelectionParameters): List<AudioTrackItem> {
         val result = mutableListOf<AudioTrackItem>()
         var audioCounter = 0
 
@@ -97,14 +103,14 @@ object PlayerTrackHelper {
 
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: languageName?.takeIf { it.isNotBlank() }
-                        ?: "Audio #$audioCounter"
+                        ?: context.getString(R.string.track_audio_default, audioCounter)
 
                     val channels = when (format.channelCount) {
-                        1 -> "Mono (1 ch)"
-                        2 -> "Stereo (2 ch)"
-                        6 -> "5.1 Surround (6 ch)"
-                        8 -> "7.1 Surround (8 ch)"
-                        in 3..Int.MAX_VALUE -> "${format.channelCount} ch"
+                        1 -> context.getString(R.string.track_channels_mono)
+                        2 -> context.getString(R.string.track_channels_stereo)
+                        6 -> context.getString(R.string.track_channels_surround_51)
+                        8 -> context.getString(R.string.track_channels_surround_71)
+                        in 3..Int.MAX_VALUE -> context.getString(R.string.track_channels_generic, format.channelCount)
                         else -> null
                     }
 
@@ -129,7 +135,7 @@ object PlayerTrackHelper {
         return result
     }
 
-    fun getSubtitleTracks(tracks: Tracks, parameters: TrackSelectionParameters): List<SubtitleTrackItem> {
+    fun getSubtitleTracks(context: Context, tracks: Tracks, parameters: TrackSelectionParameters): List<SubtitleTrackItem> {
         val result = mutableListOf<SubtitleTrackItem>()
         val isTextDisabled = parameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
         var subtitleCounter = 0
@@ -155,7 +161,7 @@ object PlayerTrackHelper {
 
                     val label = format.label?.takeIf { it.isNotBlank() }
                         ?: languageName?.takeIf { it.isNotBlank() }
-                        ?: "Subtitle #$subtitleCounter"
+                        ?: context.getString(R.string.track_subtitle_default, subtitleCounter)
 
                     result.add(
                         SubtitleTrackItem(

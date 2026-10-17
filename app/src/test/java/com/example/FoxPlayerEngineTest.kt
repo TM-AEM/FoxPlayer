@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +28,14 @@ class FoxPlayerEngineTest {
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         engine = FoxPlayerEngine(context)
+    }
+
+    @After
+    fun tearDown() {
+        // prepare() launches an async history lookup on Dispatchers.IO; releasing
+        // cancels it so it cannot outlive the test and throw once Robolectric
+        // tears down the SQLite connection pool.
+        engine.release()
     }
 
     @Test

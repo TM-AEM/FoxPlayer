@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.example.R
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -137,7 +138,7 @@ fun PlayerHud(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.player_back),
                         tint = Color.White
                     )
                 }
@@ -145,7 +146,7 @@ fun PlayerHud(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Text(
-                    text = title.ifBlank { "Video" },
+                    text = title.ifBlank { stringResource(R.string.player_default_video_title) },
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
@@ -169,7 +170,7 @@ fun PlayerHud(
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_pip),
-                            contentDescription = "Picture in Picture",
+                            contentDescription = stringResource(R.string.player_pip),
                             tint = Color.White
                         )
                     }
@@ -184,7 +185,7 @@ fun PlayerHud(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Playback settings",
+                        contentDescription = stringResource(R.string.player_settings),
                         tint = Color.White
                     )
                 }
@@ -213,7 +214,7 @@ fun PlayerHud(
                         } else {
                             Icons.Filled.PlayArrow
                         },
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) stringResource(R.string.player_pause) else stringResource(R.string.player_play),
                         tint = Color.White,
                         modifier = Modifier.size(40.dp)
                     )

@@ -55,6 +55,9 @@ class MediaRepositoryImpl(
     private val contentResolver: ContentResolver = context.contentResolver
 ) : MediaRepository {
 
+    private val defaultBucketName: String
+        get() = context.getString(com.example.R.string.library_default_folder)
+
     override fun getVideosFlow(): Flow<List<VideoItem>> = callbackFlow {
         // Query and emit initial data
         try {
@@ -201,9 +204,10 @@ class MediaRepositoryImpl(
                     val bucketName = when {
                         !bucketFromColumn.isNullOrBlank() -> bucketFromColumn
                         relativePath.isNotBlank() -> {
-                            relativePath.trim('/').split('/').lastOrNull()?.takeIf { it.isNotBlank() } ?: "Videos"
+                            relativePath.trim('/').split('/').lastOrNull()?.takeIf { it.isNotBlank() }
+                                ?: defaultBucketName
                         }
-                        else -> "Videos"
+                        else -> defaultBucketName
                     }
 
                     val bucketId = if (bucketIdColumn != -1) cursor.getString(bucketIdColumn) ?: bucketName else bucketName
@@ -299,9 +303,10 @@ class MediaRepositoryImpl(
                     val bucketName = when {
                         !bucketFromColumn.isNullOrBlank() -> bucketFromColumn
                         relativePath.isNotBlank() -> {
-                            relativePath.trim('/').split('/').lastOrNull()?.takeIf { it.isNotBlank() } ?: "Videos"
+                            relativePath.trim('/').split('/').lastOrNull()?.takeIf { it.isNotBlank() }
+                                ?: defaultBucketName
                         }
-                        else -> "Videos"
+                        else -> defaultBucketName
                     }
 
                     return@withContext VideoItem(
@@ -332,12 +337,12 @@ class MediaRepositoryImpl(
         val folderMap = mutableMapOf<String, MutableList<VideoItem>>()
 
         for (video in videos) {
-            val key = video.bucketId.ifBlank { video.bucketName.ifBlank { "Videos" } }
+            val key = video.bucketId.ifBlank { video.bucketName.ifBlank { defaultBucketName } }
             folderMap.getOrPut(key) { mutableListOf() }.add(video)
         }
 
         folderMap.map { (bucketId, videoList) ->
-            val folderName = videoList.firstOrNull()?.bucketName?.ifBlank { "Videos" } ?: "Videos"
+            val folderName = videoList.firstOrNull()?.bucketName?.ifBlank { defaultBucketName } ?: defaultBucketName
             VideoFolder(
                 bucketId = bucketId,
                 name = folderName,

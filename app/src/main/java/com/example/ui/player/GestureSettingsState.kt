@@ -1,6 +1,8 @@
 package com.example.ui.player
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
+import com.example.R
 
 /**
  * Sensitivity preset/threshold level for vertical swipe gestures (Volume and Brightness).
@@ -11,28 +13,24 @@ import androidx.compose.runtime.Immutable
  * A lower multiplier means higher threshold/lower sensitivity (smoother, more gradual changes).
  */
 enum class GestureSensitivity(
-    val label: String,
+    @StringRes val labelResId: Int,
     val touchSlop: Float,
-    val multiplier: Float,
-    val description: String
+    val multiplier: Float
 ) {
     LOW(
-        label = "Low",
+        labelResId = R.string.gesture_sensitivity_low,
         touchSlop = 26f,
-        multiplier = 0.65f,
-        description = "Requires longer swipes, fine-grained control"
+        multiplier = 0.65f
     ),
     MEDIUM(
-        label = "Medium",
+        labelResId = R.string.gesture_sensitivity_medium,
         touchSlop = 18f,
-        multiplier = 1.0f,
-        description = "Standard balanced response"
+        multiplier = 1.0f
     ),
     HIGH(
-        label = "High",
+        labelResId = R.string.gesture_sensitivity_high,
         touchSlop = 12f,
-        multiplier = 1.45f,
-        description = "Quick response, less swipe distance needed"
+        multiplier = 1.45f
     );
 
     companion object {
@@ -47,12 +45,12 @@ enum class GestureSensitivity(
  */
 enum class DoubleTapSeekDuration(
     val seconds: Int,
-    val label: String
+    @StringRes val labelResId: Int
 ) {
-    FIVE(5, "5s"),
-    TEN(10, "10s"),
-    FIFTEEN(15, "15s"),
-    THIRTY(30, "30s");
+    FIVE(5, R.string.gesture_seek_5s),
+    TEN(10, R.string.gesture_seek_10s),
+    FIFTEEN(15, R.string.gesture_seek_15s),
+    THIRTY(30, R.string.gesture_seek_30s);
 
     val durationMillis: Long get() = seconds * 1000L
 

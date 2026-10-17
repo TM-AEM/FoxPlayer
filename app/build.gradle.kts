@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -9,6 +10,41 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// --- App version -------------------------------------------------------------
+// The single source of truth for the app version is the root-level
+// `version.properties` file (VERSION_NAME + VERSION_CODE). The build fails fast
+// with a clear message if it is missing or malformed, so a broken/absent version
+// can never silently fall back to a stale hardcoded default.
+val versionPropertiesFile = rootProject.file("version.properties")
+if (!versionPropertiesFile.isFile) {
+  throw GradleException(
+    "Missing version file: '${versionPropertiesFile.path}'. " +
+      "It must exist and define VERSION_NAME and VERSION_CODE. See the Versioning section of README.md."
+  )
+}
+
+val versionProperties = Properties()
+versionPropertiesFile.inputStream().use { versionProperties.load(it) }
+
+val appVersionName: String = versionProperties.getProperty("VERSION_NAME")?.trim() ?: ""
+if (appVersionName.isEmpty()) {
+  throw GradleException(
+    "VERSION_NAME is missing or blank in '${versionPropertiesFile.path}'. " +
+      "Expected a Semantic Versioning string such as 1.0.0."
+  )
+}
+
+val rawVersionCode = versionProperties.getProperty("VERSION_CODE")
+val appVersionCode: Int = rawVersionCode?.trim()?.toIntOrNull()
+  ?: throw GradleException(
+    "VERSION_CODE in '${versionPropertiesFile.path}' must be a positive integer, but was '${rawVersionCode ?: "<missing>"}'."
+  )
+if (appVersionCode <= 0) {
+  throw GradleException(
+    "VERSION_CODE in '${versionPropertiesFile.path}' must be a positive integer, but was $appVersionCode."
+  )
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,8 +53,8 @@ android {
     applicationId = "com.aistudio.foxplayer.vqxlyt"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = appVersionCode
+    versionName = appVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -73,6 +109,17 @@ secrets {
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
+
+// Reference screenshots are read by the screenshot tests but are not otherwise
+// declared as task inputs. Without this, changing a golden image does not
+// invalidate the up-to-date check or the build cache, so Roborazzi verification
+// could be skipped and a regression would slip through. Declaring the directory
+// as an input guarantees the verify task re-runs whenever a golden changes.
+tasks.withType<Test>().configureEach {
+  inputs.dir(layout.projectDirectory.dir("src/test/screenshots"))
+    .withPropertyName("roborazziReferenceImages")
+    .optional()
+}
 
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.

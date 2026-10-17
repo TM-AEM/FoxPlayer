@@ -60,10 +60,38 @@ gradle :app:assembleRelease
 
 ---
 
+## 🔢 Versioning
+
+The app version is defined in exactly one place: the root-level **`version.properties`** file.
+
+```properties
+VERSION_NAME=1.0.0
+VERSION_CODE=2
+```
+
+- **`VERSION_NAME`** is user-facing and follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+- **`VERSION_CODE`** is the internal, strictly increasing positive integer required by Android and Google Play.
+
+`app/build.gradle.kts` reads this file at configuration time and fails the build with a clear error if the file is missing, either value is absent, `VERSION_CODE` is not a positive integer, or `VERSION_NAME` is blank.
+
+### Bumping the version
+
+| Change type | Rule | Example |
+| --- | --- | --- |
+| Bug fix | Increment `PATCH` | `1.0.0` → `1.0.1` |
+| Backward-compatible feature | Increment `MINOR`, reset `PATCH` | `1.0.1` → `1.1.0` |
+| Breaking product change | Increment `MAJOR`, reset `MINOR` and `PATCH` | `1.1.0` → `2.0.0` |
+
+**Every new release must also increment `VERSION_CODE`** to a positive integer that is greater than every version code previously published for `com.aistudio.foxplayer.vqxlyt`. Never reuse or decrease it — Google Play rejects a build whose version code has already been used, and a lower code cannot update an installed build.
+
+`VERSION_NAME` and `VERSION_CODE` are independent values. They are **not** derived from one another; bump both deliberately on each release.
+
+---
+
 ## 🔄 CI/CD & Automated Workflows
 
 The repository includes a hardened GitHub Actions workflow (`.github/workflows/android-build.yml`):
-- **Automated Verification:** On every push and pull request to `main`, runs JDK 21 setup, executes all unit tests, builds the Debug APK, and uploads `FoxPlayer-debug-apk`.
+- **Automated Verification:** On every push and pull request to `main`, runs JDK 21 setup, executes all unit tests and verifies Compose screenshot tests against committed golden images (`:app:testDebugUnitTest :app:verifyRoborazziDebug`), runs Android Lint (`:app:lintDebug`), builds the Debug APK, and uploads `FoxPlayer-debug-apk`. Unit test reports, screenshot diff reports, and the lint HTML report are uploaded as artifacts to simplify diagnosing a broken build. The reference screenshots under `app/src/test/screenshots/` are declared as Gradle task inputs, so changing a golden invalidates the task and verification can never be silently skipped by the build cache.
 - **Manual Release Packaging:** On manual trigger (`workflow_dispatch`), safely generates an isolated temporary test keystore in `runner.temp`, builds a minified Release APK, verifies signature via `apksigner verify --verbose`, and uploads `FoxPlayer-release-manual-test-apk` for direct on-device testing.
 
 ---

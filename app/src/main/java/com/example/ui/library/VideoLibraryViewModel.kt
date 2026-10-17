@@ -1,10 +1,12 @@
 package com.example.ui.library
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.model.VideoItem
 import com.example.core.util.PermissionUtils
 import com.example.data.local.database.FoxPlayerDatabase
@@ -23,12 +25,12 @@ import kotlinx.coroutines.launch
 /**
  * Sort options for the video library.
  */
-enum class VideoSortOption(val displayName: String) {
-    DATE_DESC("Newest First"),
-    DATE_ASC("Oldest First"),
-    NAME_ASC("Name (A-Z)"),
-    DURATION_DESC("Longest First"),
-    SIZE_DESC("Largest First")
+enum class VideoSortOption(@StringRes val displayNameResId: Int) {
+    DATE_DESC(R.string.library_sort_newest),
+    DATE_ASC(R.string.library_sort_oldest),
+    NAME_ASC(R.string.library_sort_name),
+    DURATION_DESC(R.string.library_sort_duration),
+    SIZE_DESC(R.string.library_sort_size)
 }
 
 /**
@@ -111,7 +113,8 @@ class VideoLibraryViewModel @JvmOverloads constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = error.localizedMessage ?: "Failed to load videos"
+                            errorMessage = error.localizedMessage
+                                ?: getApplication<Application>().getString(R.string.library_error_generic)
                         )
                     }
                 }
