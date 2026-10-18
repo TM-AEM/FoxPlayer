@@ -51,6 +51,7 @@ fun PlayerGestureDetector(
     onVerticalSwipeEnd: () -> Unit,
     onLongPressStart: () -> Unit = {},
     onLongPressEnd: () -> Unit = {},
+    onCenterTap: () -> Unit = onSingleTap,
     gestureSettings: GestureSettingsState = GestureSettingsState(),
     modifier: Modifier = Modifier
 ) {
@@ -63,6 +64,7 @@ fun PlayerGestureDetector(
 
     val currentGestureSettings by androidx.compose.runtime.rememberUpdatedState(gestureSettings)
     val currentOnSingleTap by androidx.compose.runtime.rememberUpdatedState(onSingleTap)
+    val currentOnCenterTap by androidx.compose.runtime.rememberUpdatedState(onCenterTap)
     val currentOnDoubleTapSeek by androidx.compose.runtime.rememberUpdatedState(onDoubleTapSeek)
     val currentOnHorizontalSwipeSeekStart by androidx.compose.runtime.rememberUpdatedState(onHorizontalSwipeSeekStart)
     val currentOnHorizontalSwipeSeekChange by androidx.compose.runtime.rememberUpdatedState(onHorizontalSwipeSeekChange)
@@ -98,8 +100,23 @@ fun PlayerGestureDetector(
                         isLongPressing = true
                         currentOnLongPressStart()
                     },
-                    onTap = {
-                        currentOnSingleTap()
+                    onTap = { offset ->
+                        val width = componentSize.width
+                        val height = componentSize.height
+                        // Check if tap was in the center area (middle 36% horizontally and vertically)
+                        val isCenterTap = if (width > 0 && height > 0) {
+                            val inCenterX = offset.x in (width * 0.32f)..(width * 0.68f)
+                            val inCenterY = offset.y in (height * 0.25f)..(height * 0.75f)
+                            inCenterX && inCenterY
+                        } else {
+                            false
+                        }
+
+                        if (isCenterTap) {
+                            currentOnCenterTap()
+                        } else {
+                            currentOnSingleTap()
+                        }
                     },
                     onDoubleTap = { offset ->
                         val halfWidth = componentSize.width / 2

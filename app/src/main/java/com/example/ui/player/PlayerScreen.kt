@@ -459,6 +459,21 @@ fun PlayerScreen(
                         notifyUserInteraction()
                     }
                 },
+                onCenterTap = {
+                    val targetPlayer = controller ?: activePlayer
+                    if (targetPlayer != null) {
+                        // If video has completed/ended, seek back to 0 and replay
+                        if (targetPlayer.playbackState == Player.STATE_ENDED) {
+                            targetPlayer.seekTo(0L)
+                            targetPlayer.play()
+                        } else if (targetPlayer.isPlaying) {
+                            targetPlayer.pause()
+                        } else {
+                            targetPlayer.play()
+                        }
+                    }
+                    notifyUserInteraction()
+                },
                 onDoubleTapSeek = { isForward ->
                     val targetPlayer = controller ?: activePlayer
                     val current = playbackState.currentPositionMs

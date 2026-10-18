@@ -477,4 +477,41 @@ class PlayerGestureTest {
         }
         assertEquals(30, soughtRewindDeltaSeconds)
     }
+
+    @Test
+    fun testCenterTapTriggersPlayPauseOrReplay() {
+        var centerTapped = false
+        var singleTapped = false
+
+        composeTestRule.setContent {
+            PlayerGestureDetector(
+                onSingleTap = { singleTapped = true },
+                onCenterTap = { centerTapped = true },
+                onDoubleTapSeek = {},
+                onHorizontalSwipeSeekStart = {},
+                onHorizontalSwipeSeekChange = { _, _ -> },
+                onHorizontalSwipeSeekEnd = {},
+                onVerticalSwipeBrightnessChange = {},
+                onVerticalSwipeVolumeChange = {},
+                onVerticalSwipeEnd = {},
+                modifier = Modifier.size(width = 400.dp, height = 400.dp)
+            )
+        }
+
+        // Tap dead center (200, 200) -> should trigger center tap (play/pause/resume)
+        composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
+            androidx.compose.ui.test.click(position = Offset(200f, 200f))
+        }
+        assertTrue("Center tap must be detected", centerTapped)
+        assertEquals("Single tap for general HUD toggle must not fire on center tap", false, singleTapped)
+
+        // Reset and tap in the top-left corner (20, 20) -> should trigger standard single tap (HUD toggle)
+        centerTapped = false
+        singleTapped = false
+        composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
+            androidx.compose.ui.test.click(position = Offset(20f, 20f))
+        }
+        assertTrue("Corner tap must trigger standard single tap", singleTapped)
+        assertEquals("Center tap must not fire on corner tap", false, centerTapped)
+    }
 }
