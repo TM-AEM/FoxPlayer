@@ -500,7 +500,7 @@ class PlayerGestureTest {
 
         // Tap dead center (200, 200) -> should trigger center tap (play/pause/resume)
         composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
-            androidx.compose.ui.test.click(position = Offset(200f, 200f))
+            click(position = Offset(200f, 200f))
         }
         assertTrue("Center tap must be detected", centerTapped)
         assertEquals("Single tap for general HUD toggle must not fire on center tap", false, singleTapped)
@@ -509,7 +509,7 @@ class PlayerGestureTest {
         centerTapped = false
         singleTapped = false
         composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
-            androidx.compose.ui.test.click(position = Offset(20f, 20f))
+            click(position = Offset(20f, 20f))
         }
         assertTrue("Corner tap must trigger standard single tap", singleTapped)
         assertEquals("Center tap must not fire on corner tap", false, centerTapped)
