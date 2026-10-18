@@ -197,4 +197,16 @@ class MediaRepositoryTest {
         assertTrue(folders.any { it.name == "DCIM" })
         assertEquals("Distinct folders should produce separate folder items", 2, folders.size)
     }
+
+    @Test
+    fun testPermissionMatrixForApiLevels() {
+        // Test permissions returned for API 34+
+        val perms = PermissionUtils.getRequiredVideoPermissions()
+        assertTrue(perms.contains("android.permission.READ_MEDIA_VIDEO"))
+        assertTrue(perms.contains("android.permission.READ_MEDIA_VISUAL_USER_SELECTED"))
+
+        // Verify required single permission
+        val requiredPerm = PermissionUtils.getRequiredVideoPermission()
+        assertEquals("android.permission.READ_MEDIA_VIDEO", requiredPerm)
+    }
 }

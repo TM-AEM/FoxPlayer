@@ -366,7 +366,9 @@ class FoxPlayerEngine(
                             watchPercentage = percentage
                         )
                         historyDao?.upsertHistory(entity)
-                    } catch (_: Throwable) {
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
                         // Safe database handling
                     }
                 }
