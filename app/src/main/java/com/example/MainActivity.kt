@@ -61,16 +61,6 @@ class MainActivity : AppCompatActivity() {
         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
     }
 
-    // Safe one-time handoff from DataStore to AppCompatDelegate if locales not yet set
-    val settingsRepo = AppSettingsRepositoryImpl.getInstance(applicationContext)
-    lifecycleScope.launch {
-      val savedSettings = settingsRepo.appSettingsFlow.firstOrNull() ?: AppSettings()
-      val currentLocales = AppCompatDelegate.getApplicationLocales()
-      if (currentLocales.isEmpty && savedSettings.language != AppLanguage.SYSTEM && savedSettings.language.code.isNotEmpty()) {
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(savedSettings.language.code))
-      }
-    }
-
     setContent {
       val context = LocalContext.current
       val settingsRepository = remember { AppSettingsRepositoryImpl.getInstance(context) }

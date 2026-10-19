@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -502,6 +503,7 @@ class PlayerGestureTest {
         composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
             click(position = Offset(200f, 200f))
         }
+        composeTestRule.mainClock.advanceTimeBy(500)
         assertTrue("Center tap must be detected", centerTapped)
         assertEquals("Single tap for general HUD toggle must not fire on center tap", false, singleTapped)
 
@@ -511,6 +513,7 @@ class PlayerGestureTest {
         composeTestRule.onNodeWithTag("player_gesture_detector").performTouchInput {
             click(position = Offset(20f, 20f))
         }
+        composeTestRule.mainClock.advanceTimeBy(500)
         assertTrue("Corner tap must trigger standard single tap", singleTapped)
         assertEquals("Center tap must not fire on corner tap", false, centerTapped)
     }

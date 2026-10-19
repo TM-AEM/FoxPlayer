@@ -38,14 +38,26 @@ class SettingsViewModel(
         )
 
     fun onLanguageSelected(language: AppLanguage) {
+        val localeList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(language.code)
+        }
+        AppCompatDelegate.setApplicationLocales(localeList)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val localeManager = getApplication<Application>().getSystemService(android.app.LocaleManager::class.java)
+                val androidLocaleList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
+                    android.os.LocaleList.getEmptyLocaleList()
+                } else {
+                    android.os.LocaleList.forLanguageTags(language.code)
+                }
+                localeManager?.applicationLocales = androidLocaleList
+            } catch (_: Exception) {
+            }
+        }
         effectiveScope.launch {
             settingsRepository.updateLanguage(language)
-            val localeList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
-                LocaleListCompat.getEmptyLocaleList()
-            } else {
-                LocaleListCompat.forLanguageTags(language.code)
-            }
-            AppCompatDelegate.setApplicationLocales(localeList)
         }
     }
 
