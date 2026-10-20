@@ -2,6 +2,7 @@ package com.example
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import com.example.core.model.AppTheme
 import com.example.ui.player.PlayerHud
 import com.example.ui.theme.MyApplicationTheme
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -15,15 +16,20 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [36])
+@Config(qualifiers = "${RobolectricDeviceQualifiers.Pixel8} +night", sdk = [36])
 class PlayerHudScreenshotTest {
 
   @get:Rule val composeTestRule = createComposeRule()
 
   @Test
   fun playerHud_screenshot() {
+    composeTestRule.mainClock.autoAdvance = false
     composeTestRule.setContent {
-      MyApplicationTheme {
+      MyApplicationTheme(
+        appTheme = AppTheme.DARK,
+        darkTheme = true,
+        dynamicColor = false
+      ) {
         PlayerHud(
           isVisible = true,
           title = "FoxPlayer",
@@ -38,6 +44,8 @@ class PlayerHudScreenshotTest {
         )
       }
     }
+    composeTestRule.mainClock.advanceTimeBy(1_000)
+    composeTestRule.waitForIdle()
 
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/player_hud.png")
   }
