@@ -1,16 +1,24 @@
 package com.example
 
+import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.model.AppLanguage
-import com.example.core.model.AppSettings
 import com.example.data.repository.AppSettingsRepositoryImpl
 import com.example.ui.settings.SettingsViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -18,14 +26,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
+import org.robolectric.shadows.ShadowLooper
 import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -36,21 +43,25 @@ class LocaleIntegrationTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    private lateinit var testDispatcher: StandardTestDispatcher
+    private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
 
     private lateinit var dataStoreFile: File
+    private lateinit var dataStoreScope: CoroutineScope
     private lateinit var repo: com.example.data.repository.AppSettingsRepository
 
     @Before
     fun setUp() {
         testDispatcher = StandardTestDispatcher()
         testScope = TestScope(testDispatcher)
+        dataStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-        org.robolectric.shadows.ShadowLooper.idleMainLooper()
-        dataStoreFile = tempFolder.newFile("test_locale_settings_${System.currentTimeMillis()}_${System.nanoTime()}.preferences_pb")
+        ShadowLooper.idleMainLooper()
+        dataStoreFile = tempFolder.newFile(
+            "test_locale_settings_${System.currentTimeMillis()}_${System.nanoTime()}.preferences_pb"
+        )
         val dataStore = PreferenceDataStoreFactory.create(
-            scope = testScope,
+            scope = dataStoreScope,
             produceFile = { dataStoreFile }
         )
         repo = AppSettingsRepositoryImpl(dataStore)
@@ -59,10 +70,19 @@ class LocaleIntegrationTest {
     @After
     fun tearDown() {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        ShadowLooper.idleMainLooper()
+        if (::dataStoreScope.isInitialized) {
+            dataStoreScope.cancel()
+        }
         if (::dataStoreFile.isInitialized && dataStoreFile.exists()) {
             dataStoreFile.delete()
         }
+    }
+
+    private fun flushLocaleWork() {
+        ShadowLooper.idleMainLooper()
+        testDispatcher.scheduler.advanceUntilIdle()
+        ShadowLooper.idleMainLooper()
     }
 
     @Test
@@ -73,7 +93,7 @@ class LocaleIntegrationTest {
                 assertTrue(activity is androidx.appcompat.app.AppCompatActivity)
             }
         }
-        org.robolectric.shadows.ShadowLooper.idleMainLooper()
+        ShadowLooper.idleMainLooper()
     }
 
     @Test
@@ -81,39 +101,43 @@ class LocaleIntegrationTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             println("IN_ACTIVITY_BEFORE: '${AppCompatDelegate.getApplicationLocales().toLanguageTags()}'")
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar"))
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            ShadowLooper.idleMainLooper()
             println("IN_ACTIVITY_AFTER: '${AppCompatDelegate.getApplicationLocales().toLanguageTags()}'")
+            assertTrue(
+                "Expected 'ar' in '${AppCompatDelegate.getApplicationLocales().toLanguageTags()}'",
+                AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar")
+            )
         }
     }
 
     @Test
     fun testSelectingArabicAppliesAppCompatLocales() = testScope.runTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            val context = ApplicationProvider.getApplicationContext<android.app.Application>()
-            val viewModel = SettingsViewModel(context, repo, testScope.backgroundScope)
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val viewModel = SettingsViewModel(context, repo)
 
             viewModel.onLanguageSelected(AppLanguage.ARABIC)
-            testDispatcher.scheduler.advanceUntilIdle()
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            flushLocaleWork()
 
-            // Verify DataStore persistence
             val saved = repo.appSettingsFlow.first()
             assertEquals(AppLanguage.ARABIC, saved.language)
 
             val currentLocales = AppCompatDelegate.getApplicationLocales()
-            assertTrue("Expected 'ar' in '${currentLocales.toLanguageTags()}'", currentLocales.toLanguageTags().contains("ar"))
+            assertTrue(
+                "Expected 'ar' in '${currentLocales.toLanguageTags()}'",
+                currentLocales.toLanguageTags().contains("ar")
+            )
         }
     }
 
     @Test
     fun testSelectingEnglishAppliesAppCompatLocales() = testScope.runTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            val context = ApplicationProvider.getApplicationContext<android.app.Application>()
-            val viewModel = SettingsViewModel(context, repo, testScope.backgroundScope)
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val viewModel = SettingsViewModel(context, repo)
 
             viewModel.onLanguageSelected(AppLanguage.ENGLISH)
-            testDispatcher.scheduler.advanceUntilIdle()
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            flushLocaleWork()
 
             val saved = repo.appSettingsFlow.first()
             assertEquals(AppLanguage.ENGLISH, saved.language)
@@ -126,19 +150,15 @@ class LocaleIntegrationTest {
     @Test
     fun testSelectingSystemResetsAppCompatLocales() = testScope.runTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            val context = ApplicationProvider.getApplicationContext<android.app.Application>()
-            val viewModel = SettingsViewModel(context, repo, testScope.backgroundScope)
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val viewModel = SettingsViewModel(context, repo)
 
-            // First select Arabic
             viewModel.onLanguageSelected(AppLanguage.ARABIC)
-            testDispatcher.scheduler.advanceUntilIdle()
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            flushLocaleWork()
             assertTrue(AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar"))
 
-            // Then select System Default
             viewModel.onLanguageSelected(AppLanguage.SYSTEM)
-            testDispatcher.scheduler.advanceUntilIdle()
-            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            flushLocaleWork()
 
             val saved = repo.appSettingsFlow.first()
             assertEquals(AppLanguage.SYSTEM, saved.language)
@@ -149,20 +169,109 @@ class LocaleIntegrationTest {
     }
 
     @Test
-    fun testActivityRecreationUnderArabicLocale() {
-        // Set Arabic locale before launch
-        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar"))
-
+    fun testDefaultViewModelFactoryCanConstructSettingsViewModel() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                assertNotNull(activity)
+                val viewModel = ViewModelProvider(
+                    ViewModelStore(),
+                    ViewModelProvider.AndroidViewModelFactory.getInstance(
+                        activity.application
+                    )
+                )[SettingsViewModel::class.java]
+                assertNotNull(viewModel)
+                assertEquals(AppLanguage.SYSTEM, viewModel.uiState.value.language)
             }
-            // Recreate activity to test configuration change lifecycle
-            scenario.recreate()
+        }
+    }
+
+    @Test
+    fun testActivityRecreationUnderArabicLocale() = testScope.runTest {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val productionRepo = AppSettingsRepositoryImpl.getInstance(context)
+        try {
+            productionRepo.updateLanguage(AppLanguage.ARABIC)
+            flushLocaleWork()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ar"))
+            ShadowLooper.idleMainLooper()
+
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    assertNotNull(activity)
+                }
+                scenario.recreate()
+                flushLocaleWork()
+                scenario.onActivity { activity ->
+                    assertNotNull(activity)
+                    assertTrue(activity is androidx.appcompat.app.AppCompatActivity)
+                    assertTrue(
+                        "Arabic locale must survive recreation, was '${AppCompatDelegate.getApplicationLocales().toLanguageTags()}'",
+                        AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar")
+                    )
+                }
+                assertEquals(AppLanguage.ARABIC, productionRepo.appSettingsFlow.first().language)
+            }
+        } finally {
+            productionRepo.updateLanguage(AppLanguage.SYSTEM)
+            flushLocaleWork()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+            ShadowLooper.idleMainLooper()
+        }
+    }
+
+    @Test
+    fun testRepeatedLanguageChangesDoNotCrash() = testScope.runTest {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val viewModel = SettingsViewModel(context, repo)
+
+            viewModel.onLanguageSelected(AppLanguage.ARABIC)
+            flushLocaleWork()
+
+            viewModel.onLanguageSelected(AppLanguage.ENGLISH)
+            flushLocaleWork()
+
+            viewModel.onLanguageSelected(AppLanguage.ARABIC)
+            flushLocaleWork()
+
+            viewModel.onLanguageSelected(AppLanguage.SYSTEM)
+            flushLocaleWork()
+
             scenario.onActivity { activity ->
                 assertNotNull(activity)
-                assertTrue(activity is androidx.appcompat.app.AppCompatActivity)
             }
+
+            val saved = repo.appSettingsFlow.first()
+            assertEquals(AppLanguage.SYSTEM, saved.language)
+            val currentLocales = AppCompatDelegate.getApplicationLocales()
+            assertTrue(currentLocales.isEmpty || currentLocales.toLanguageTags().isEmpty())
+        }
+    }
+
+    @Test
+    fun testSavedLanguageRestoredAfterProcessRestart() = testScope.runTest {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val productionRepo = AppSettingsRepositoryImpl.getInstance(context)
+        try {
+            productionRepo.updateLanguage(AppLanguage.ARABIC)
+            flushLocaleWork()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+            ShadowLooper.idleMainLooper()
+
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                flushLocaleWork()
+                scenario.onActivity { activity ->
+                    assertNotNull(activity)
+                    assertTrue(
+                        "Saved Arabic locale must be restored on launch, was '${AppCompatDelegate.getApplicationLocales().toLanguageTags()}'",
+                        AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar")
+                    )
+                }
+            }
+        } finally {
+            productionRepo.updateLanguage(AppLanguage.SYSTEM)
+            flushLocaleWork()
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+            ShadowLooper.idleMainLooper()
         }
     }
 }

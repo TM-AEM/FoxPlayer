@@ -61,6 +61,21 @@ class MainActivity : AppCompatActivity() {
         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
     }
 
+    val settingsRepo = AppSettingsRepositoryImpl.getInstance(applicationContext)
+    lifecycleScope.launch {
+      val savedSettings = settingsRepo.appSettingsFlow.firstOrNull() ?: AppSettings()
+      val currentLocales = AppCompatDelegate.getApplicationLocales()
+      val savedLanguage = savedSettings.language
+      if (currentLocales.isEmpty &&
+        savedLanguage != AppLanguage.SYSTEM &&
+        savedLanguage.code.isNotEmpty()
+      ) {
+        AppCompatDelegate.setApplicationLocales(
+          LocaleListCompat.forLanguageTags(savedLanguage.code)
+        )
+      }
+    }
+
     setContent {
       val context = LocalContext.current
       val settingsRepository = remember { AppSettingsRepositoryImpl.getInstance(context) }

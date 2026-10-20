@@ -12,7 +12,7 @@ import com.example.core.model.AppSettings
 import com.example.core.model.AppTheme
 import com.example.data.repository.AppSettingsRepository
 import com.example.data.repository.AppSettingsRepositoryImpl
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -21,8 +21,16 @@ import kotlinx.coroutines.withContext
 
 /**
  * ViewModel managing global application preferences state and mutation.
+ *
+ * Per-app language is applied through [AppCompatDelegate.setApplicationLocales] only.
+ * Dual writes to [android.app.LocaleManager] are intentionally avoided: AppCompat already
+ * syncs with LocaleManager on API 33+, and a second write races Activity recreation.
+ *
+ * [AndroidViewModelFactory] constructs this class with only [Application], so the
+ * secondary parameters must have JVM-visible defaults ([JvmOverloads]). Without that,
+ * opening Settings after Activity recreation throws NoSuchMethodException.
  */
-class SettingsViewModel(
+class SettingsViewModel @JvmOverloads constructor(
     application: Application,
     private val settingsRepository: AppSettingsRepository = AppSettingsRepositoryImpl.getInstance(application),
     scope: kotlinx.coroutines.CoroutineScope? = null
@@ -38,27 +46,13 @@ class SettingsViewModel(
         )
 
     fun onLanguageSelected(language: AppLanguage) {
-        val localeList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
-            LocaleListCompat.getEmptyLocaleList()
-        } else {
-            LocaleListCompat.forLanguageTags(language.code)
-        }
-        AppCompatDelegate.setApplicationLocales(localeList)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            try {
-                val localeManager = getApplication<Application>().getSystemService(android.app.LocaleManager::class.java)
-                val androidLocaleList = if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
-                    android.os.LocaleList.getEmptyLocaleList()
-                } else {
-                    android.os.LocaleList.forLanguageTags(language.code)
-                }
-                localeManager?.applicationLocales = androidLocaleList
-            } catch (_: Exception) {
+        val localeList = localeListFor(language)
+        effectiveScope.launch {
+            withContext(NonCancellable) {
+                settingsRepository.updateLanguage(language)
             }
         }
-        effectiveScope.launch {
-            settingsRepository.updateLanguage(language)
-        }
+        AppCompatDelegate.setApplicationLocales(localeList)
     }
 
     fun onThemeSelected(theme: AppTheme) {
@@ -83,6 +77,16 @@ class SettingsViewModel(
                 SettingsViewModel(application, settingsRepository) as T
             } else {
                 SettingsViewModel(application) as T
+            }
+        }
+    }
+
+    companion object {
+        fun localeListFor(language: AppLanguage): LocaleListCompat {
+            return if (language == AppLanguage.SYSTEM || language.code.isEmpty()) {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(language.code)
             }
         }
     }

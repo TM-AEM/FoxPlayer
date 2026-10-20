@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.app.Application
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +54,11 @@ import com.example.core.model.AppTheme
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    viewModel: SettingsViewModel = viewModel(),
+    viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.Factory(
+            LocalContext.current.applicationContext as Application
+        )
+    ),
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
