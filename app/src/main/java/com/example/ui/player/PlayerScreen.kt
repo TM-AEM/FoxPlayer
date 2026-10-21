@@ -159,8 +159,7 @@ fun PlayerScreen(
     val gestureController = remember(context, activity) {
         PlayerGestureController(
             context = context,
-            activity = activity,
-            playerProvider = { controller ?: activePlayer }
+            activity = activity
         )
     }
 
@@ -549,6 +548,7 @@ fun PlayerScreen(
                     notifyUserInteraction()
                 },
                 onVerticalSwipeEnd = {
+                    gestureController.resetPendingVolumeAdjustment()
                     notifyUserInteraction()
                 },
                 onLongPressStart = {
