@@ -199,8 +199,9 @@ class MediaRepositoryTest {
     }
 
     @Test
-    fun testPermissionMatrixForApiLevels() {
-        // Test permissions returned for API 34+
+    fun testPermissionMatrixForApi34() {
+        // This test class runs on API 34 only (see the @Config above). The full permission
+        // matrix across API 32, 33, 34 and 36 is covered by PermissionMatrixTest.
         val perms = PermissionUtils.getRequiredVideoPermissions()
         assertTrue(perms.contains("android.permission.READ_MEDIA_VIDEO"))
         assertTrue(perms.contains("android.permission.READ_MEDIA_VISUAL_USER_SELECTED"))
