@@ -13,6 +13,9 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionToken
 import com.example.MainActivity
 import com.example.core.model.VideoItem
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Foreground [MediaSessionService] managing the lifecycle of the [MediaSession] and [ExoPlayer].
@@ -35,11 +38,33 @@ class PlaybackService : MediaSessionService() {
 
         @Volatile
         var currentEngine: PlayerEngine? = null
-            internal set
+            private set
 
         @Volatile
         var currentSessionToken: SessionToken? = null
             internal set
+
+        private val _currentEngineFlow = MutableStateFlow<PlayerEngine?>(null)
+
+        /**
+         * The engine of the running service, or `null` while no service is alive.
+         *
+         * Unlike [currentEngine] this handle is observable, so a consumer can
+         * follow the service lifecycle instead of pinning whichever engine
+         * happened to exist when it was first composed.
+         */
+        val currentEngineFlow: StateFlow<PlayerEngine?> = _currentEngineFlow.asStateFlow()
+
+        /**
+         * Publishes [engine] as the engine of the running service.
+         *
+         * Both handles are updated together so they can never disagree about
+         * which engine is live.
+         */
+        internal fun publishEngine(engine: PlayerEngine?) {
+            currentEngine = engine
+            _currentEngineFlow.value = engine
+        }
 
         fun startPlayback(context: Context, videoItem: VideoItem): Boolean {
             val intent = Intent(context, PlaybackService::class.java).apply {
@@ -101,7 +126,6 @@ class PlaybackService : MediaSessionService() {
 
         val engine = FoxPlayerEngine(applicationContext)
         this.playerEngine = engine
-        currentEngine = engine
 
         val sessionActivityPendingIntent = PendingIntent.getActivity(
             this,
@@ -147,7 +171,13 @@ class PlaybackService : MediaSessionService() {
             .setId("FoxPlayerMediaSession")
             .build()
         this.mediaSession = session
+        // The token of the session is published before the engine: the engine is
+        // the observable handle a consumer follows, so the session it belongs to
+        // has to be reachable by the time the engine becomes visible. Publishing
+        // the engine first would let a consumer react to a session that does not
+        // exist yet.
         currentSessionToken = session.token
+        publishEngine(engine)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -163,7 +193,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         currentSessionToken = null
-        currentEngine = null
+        publishEngine(null)
         mediaSession?.run {
             release()
             mediaSession = null

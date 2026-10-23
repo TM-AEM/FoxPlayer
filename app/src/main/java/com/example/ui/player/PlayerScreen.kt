@@ -1,7 +1,6 @@
 package com.example.ui.player
 
 import android.app.Activity
-import android.content.ComponentName
 import android.view.SurfaceView
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
@@ -22,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,13 +49,11 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 import com.example.R
-import com.example.core.model.PlaybackState
 import com.example.core.model.PlaybackStatus
+import com.example.core.playback.ActivePlaybackResolver
 import com.example.core.playback.PlaybackService
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -65,7 +63,14 @@ import kotlinx.coroutines.launch
  * - Does NOT create or own an ExoPlayer instance.
  * - Connects via [MediaController] to [PlaybackService].
  * - Decouples HUD overlay from hardware [SurfaceView].
- * - Play/Pause and Seek are dispatched directly through [MediaController] (or active player).
+ * - Play/Pause and Seek are dispatched through the single active peer resolved by
+ *   [ActivePlaybackResolver], which also provides the observed playback state, so
+ *   commands and the displayed state always describe the same playback session.
+ * - Never commands a [MediaController] whose session is gone: a disconnected
+ *   controller is a proxy of a session that no longer exists, so the engine of the
+ *   live session takes the commands over.
+ * - Rebuilds the [MediaController] when the service is recreated, so the screen
+ *   reaches the new session without the user having to leave and reopen it.
  * - Implements lifecycle-safe Auto-hide mechanism for HUD controls with single-tap toggle.
  * - Dynamically maintains video aspect ratio without distortion (16:9, 4:3, ultrawide, portrait).
  * - Leaves system bars in immersive sticky mode during playback and cleanly restores them on exit.
@@ -102,50 +107,113 @@ fun PlayerScreen(
         }
     }
 
-    // MediaController connection to PlaybackService
-    var controller by remember { mutableStateOf<MediaController?>(null) }
+    // The engine of the running service is the state authority. It is observed
+    // reactively so the screen follows the service lifecycle instead of pinning
+    // whichever engine happened to exist at the first composition.
+    val engine by PlaybackService.currentEngineFlow.collectAsState()
 
-    DisposableEffect(context) {
+    // MediaController connection to PlaybackService.
+    //
+    // The controller is only a proxy of a session: it can forward commands while
+    // that session is alive and turns useless the moment the session is gone.
+    // The lifecycle of the controller keeps that promise: every build attempt
+    // owns a unique token, so a callback of an obsolete attempt can never clear
+    // or overwrite a newer controller.
+    val controllerLifecycle = remember { ControllerLifecycle<MediaController>() }
+    val controller = controllerLifecycle.controller
+
+    // Bumped to request a fresh controller after the previous one was lost.
+    val controllerRequest = controllerLifecycle.requestCount
+
+    DisposableEffect(controllerRequest, engine) {
+        val buildToken = controllerLifecycle.startAttempt()
+
+        // Only a live session can be controlled. The service publishes the token of
+        // its session before it publishes the engine, so the token that belongs to
+        // the observed engine is always reachable here. Without a session there is
+        // nothing to connect to: a controller for a service that is not alive would
+        // only be a proxy of a session that does not exist, and it could never
+        // forward a command.
         val sessionToken = PlaybackService.currentSessionToken
-            ?: SessionToken(
-                context,
-                ComponentName(context, PlaybackService::class.java)
-            )
 
         var futureToRelease: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
-        try {
-            val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
-            futureToRelease = controllerFuture
-            controllerFuture.addListener(
-                {
-                    try {
-                        if (!controllerFuture.isCancelled) {
-                            controller = controllerFuture.get()
+        if (sessionToken != null) {
+            try {
+                val controllerFuture = MediaController.Builder(context, sessionToken)
+                    .setListener(object : MediaController.Listener {
+                        override fun onDisconnected(disconnected: MediaController) {
+                            // The session of this controller is gone. Drop it so the UI falls
+                            // back to the engine of the live session instead of commanding a
+                            // controller whose session no longer exists. This callback is the
+                            // authoritative signal of that event; the connection check of the
+                            // active peer resolution is the safety net for a controller that
+                            // is already disconnected when the peer is resolved.
+                            ContextCompat.getMainExecutor(context).execute {
+                                // A callback of an obsolete attempt must never touch the
+                                // controller of a newer attempt.
+                                if (!controllerLifecycle.isCurrentAttempt(buildToken)) return@execute
+                                // The controller of the dead session is dropped and a
+                                // fresh one is requested: the service may have been
+                                // recreated with a new session.
+                                controllerLifecycle.onDisconnected(disconnected)
+                            }
                         }
-                    } catch (_: Throwable) {
-                        // Fallback to PlaybackService.currentEngine if controller future encounters issue
-                    }
-                },
-                ContextCompat.getMainExecutor(context)
-            )
-        } catch (_: Throwable) {
-            // Handled gracefully in environments without full ServiceManager
+                    })
+                    .buildAsync()
+                futureToRelease = controllerFuture
+                controllerFuture.addListener(
+                    {
+                        try {
+                            if (!controllerFuture.isCancelled) {
+                                val built = controllerFuture.get()
+                                // The completion of an obsolete attempt must never replace
+                                // the controller of a newer attempt.
+                                controllerLifecycle.onBuilt(buildToken, built)
+                            }
+                        } catch (_: Throwable) {
+                            // The session is not reachable. The engine of the live service
+                            // stays the command target.
+                        }
+                    },
+                    ContextCompat.getMainExecutor(context)
+                )
+            } catch (_: Throwable) {
+                // Handled gracefully in environments without full ServiceManager
+            }
         }
 
         onDispose {
-            controller = null
+            // The attempt is obsolete: a late callback of it must never clear or
+            // overwrite the controller of a newer attempt. The controller itself is
+            // released here, which makes it report itself as disconnected, so it can
+            // no longer be mistaken for a usable peer.
+            controllerLifecycle.invalidateAttempt(buildToken)
             futureToRelease?.let { MediaController.releaseFuture(it) }
         }
     }
 
-    // Use connected MediaController or service engine player
-    val activePlayer: Player? = controller ?: PlaybackService.currentEngine?.player
-
-    // Collect PlaybackState from the active engine
-    val playbackStateFlow = remember(PlaybackService.currentEngine) {
-        PlaybackService.currentEngine?.playbackState ?: MutableStateFlow(PlaybackState())
+    // A single resolution of the active peer: playback commands and the observed
+    // playback state always describe the same playback session. Re-resolving on
+    // every change of the controller or the engine restarts the state collection
+    // for the new source and stops the collection of the obsolete one.
+    //
+    // A controller that is disconnected at the moment of the resolution is never
+    // the command target: the engine of the live session takes the commands over
+    // while the observed state keeps coming from that very engine. The connection
+    // is read again on every resolution, and the disconnection callback drops the
+    // controller as soon as its session is reported gone, so the commands reach
+    // the engine of the live session from that moment on.
+    val activeSource = remember(controller, engine) {
+        ActivePlaybackResolver.resolve(controller, engine) {
+            controller?.isConnected() == true
+        }
     }
-    val playbackState by playbackStateFlow.collectAsState()
+
+    // The peer that receives every playback command.
+    val activePlayer: Player? = activeSource.player
+
+    // The state of that very peer.
+    val playbackState by activeSource.playbackState.collectAsState()
 
     // Title from MediaMetadata or PlaybackService engine
     val defaultVideoTitle = stringResource(R.string.player_default_video_title)
@@ -245,7 +313,7 @@ fun PlayerScreen(
 
     fun startSpeedBoost() {
         if (!isSpeedBoosted) {
-            val targetPlayer = controller ?: activePlayer
+            val targetPlayer = activePlayer
             val original = targetPlayer?.playbackParameters?.speed ?: currentSpeed
             speedBeforeBoost = original
             isSpeedBoosted = true
@@ -257,7 +325,7 @@ fun PlayerScreen(
 
     fun endSpeedBoost() {
         if (isSpeedBoosted) {
-            val targetPlayer = controller ?: activePlayer
+            val targetPlayer = activePlayer
             targetPlayer?.setPlaybackSpeed(speedBeforeBoost)
             isSpeedBoosted = false
             if (gestureFeedback is GestureFeedback.SpeedBoost) {
@@ -459,7 +527,7 @@ fun PlayerScreen(
                     }
                 },
                 onCenterTap = {
-                    val targetPlayer = controller ?: activePlayer
+                    val targetPlayer = activePlayer
                     if (targetPlayer != null) {
                         // If video has completed/ended, seek back to 0 and replay
                         if (targetPlayer.playbackState == Player.STATE_ENDED) {
@@ -474,7 +542,7 @@ fun PlayerScreen(
                     notifyUserInteraction()
                 },
                 onDoubleTapSeek = { isForward ->
-                    val targetPlayer = controller ?: activePlayer
+                    val targetPlayer = activePlayer
                     val current = playbackState.currentPositionMs
                     val duration = playbackState.durationMs
                     val seekDuration = gestureSettings.doubleTapSeekDuration
@@ -525,7 +593,7 @@ fun PlayerScreen(
                 },
                 onHorizontalSwipeSeekEnd = {
                     if (isHorizontalSwiping) {
-                        val targetPlayer = controller ?: activePlayer
+                        val targetPlayer = activePlayer
                         targetPlayer?.seekTo(swipeTargetSeekPositionMs)
                         isHorizontalSwiping = false
                         notifyUserInteraction()
@@ -600,7 +668,7 @@ fun PlayerScreen(
             durationMs = playbackState.durationMs,
             bufferedPositionMs = playbackState.bufferedPositionMs,
             onPlayPauseClick = {
-                val targetPlayer = controller ?: activePlayer
+                val targetPlayer = activePlayer
                 if (targetPlayer != null) {
                     if (targetPlayer.isPlaying) {
                         targetPlayer.pause()
@@ -610,7 +678,7 @@ fun PlayerScreen(
                 }
             },
             onSeek = { targetPositionMs ->
-                val targetPlayer = controller ?: activePlayer
+                val targetPlayer = activePlayer
                 val safeDur = playbackState.durationMs
                 val clampedPosition = if (safeDur > 0L) {
                     targetPositionMs.coerceIn(0L, safeDur)
@@ -642,7 +710,7 @@ fun PlayerScreen(
                 isOpen = isSettingsOpen,
                 currentSpeed = currentSpeed,
                 onSpeedSelected = { speed ->
-                    val targetPlayer = controller ?: activePlayer
+                    val targetPlayer = activePlayer
                     targetPlayer?.setPlaybackSpeed(speed)
                     currentSpeed = speed
                     notifyUserInteraction()
@@ -655,7 +723,7 @@ fun PlayerScreen(
                 audioTracks = audioTracks,
                 isAudioAuto = isAudioAuto,
                 onAudioTrackSelected = { track ->
-                    val targetPlayer = controller ?: activePlayer
+                    val targetPlayer = activePlayer
                     if (targetPlayer != null) {
                         PlayerTrackHelper.selectAudioTrack(targetPlayer, track)
                         currentTrackParameters = targetPlayer.trackSelectionParameters
@@ -666,7 +734,7 @@ fun PlayerScreen(
                 isSubtitleOff = isSubtitleOff,
                 isSubtitleAuto = isSubtitleAuto,
                 onSubtitleModeSelected = { mode ->
-                    val targetPlayer = controller ?: activePlayer
+                    val targetPlayer = activePlayer
                     if (targetPlayer != null) {
                         PlayerTrackHelper.selectSubtitleTrack(targetPlayer, mode)
                         currentTrackParameters = targetPlayer.trackSelectionParameters

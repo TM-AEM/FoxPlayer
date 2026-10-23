@@ -8,6 +8,7 @@ import android.content.Intent
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -17,11 +18,13 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.model.AppTheme
 import com.example.core.playback.PlaybackService
 import com.example.ui.theme.MyApplicationTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -30,6 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLooper
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -151,12 +155,23 @@ class MainActivitySnackbarTest {
     }
 
     /**
+     * The context the home screen is rendered with.
+     *
+     * It is a state, so that the test can hand over a new context later and force a
+     * recomposition of the home screen, which is what a configuration change of the activity
+     * does in production.
+     */
+    private val providedContext = mutableStateOf<Context?>(null)
+
+    /**
      * Renders the production home screen with a replaced [LocalContext], so that the service start
      * behaviour of the whole screen is controlled by the test.
      */
     private fun setHomeContent(failingContext: Context) {
+        providedContext.value = failingContext
         composeTestRule.setContent {
-            CompositionLocalProvider(LocalContext provides failingContext) {
+            val current = providedContext.value ?: return@setContent
+            CompositionLocalProvider(LocalContext provides current) {
                 MyApplicationTheme(
                     appTheme = AppTheme.LIGHT,
                     darkTheme = false,
@@ -208,6 +223,29 @@ class MainActivitySnackbarTest {
         composeTestRule
             .onNode(hasText(expectedString(R.string.player_error_playback_start_failed)))
             .assertIsDisplayed()
+    }
+
+    /**
+     * A failed playback start must not navigate anywhere else.
+     *
+     * The failure is reported by the Snackbar, the library stays on screen. A start that
+     * failed must never open the player screen, because there is no playback session that
+     * the player could control.
+     */
+    @Test
+    fun aFailedStartKeepsTheLibraryOnScreen() {
+        val failingContext = ServiceStartContext(composeTestRule.activity, failServiceStart = true)
+        setHomeContent(failingContext)
+
+        clickVideoCard()
+
+        composeTestRule
+            .onNode(hasText(expectedString(R.string.player_error_playback_start_failed)))
+            .assertIsDisplayed()
+        // The error is reported by the Snackbar, the library stays on screen: a failed start
+        // must not navigate to the player, because there is no session the player could control.
+        composeTestRule.onNodeWithTag("library_settings_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("player_screen_root").assertDoesNotExist()
     }
 
     @Test
@@ -363,6 +401,54 @@ class MainActivitySnackbarTest {
         )
     }
 
+    /**
+     * A recomposition of the home screen must neither lose the failure Snackbar nor turn one
+     * failure into several Snackbar events.
+     *
+     * The failure request is launched by the click handler of the library, so a recomposition
+     * must not enqueue it again. A duplicated event would only show up after the first Snackbar
+     * expired, which is why the clock is advanced at the end of this test. The Snackbar itself
+     * belongs to the state of the home screen, so it has to survive the recomposition.
+     */
+    @Test
+    fun aRecompositionDoesNotDuplicateTheFailureSnackbar() {
+        val failingContext = ServiceStartContext(composeTestRule.activity, failServiceStart = true)
+        setHomeContent(failingContext)
+
+        val failureMessage = expectedString(R.string.player_error_playback_start_failed)
+        val retryLabel = expectedString(R.string.library_retry)
+
+        clickVideoCard()
+        composeTestRule.onNode(hasText(failureMessage)).assertIsDisplayed()
+
+        // The home screen is recomposed with a new context, which is what a configuration change
+        // of the activity does in production. The new context fails the service start like the
+        // old one, so the failure stays the same.
+        providedContext.value = ServiceStartContext(composeTestRule.activity, failServiceStart = true)
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            "Only one failure Snackbar may be visible after a recomposition",
+            1,
+            countNodesWithText(failureMessage)
+        )
+        assertEquals(
+            "Only one retry action may be visible after a recomposition",
+            1,
+            countNodesWithText(retryLabel)
+        )
+
+        // A duplicated event would leave a second failure Snackbar behind once the first one
+        // expired.
+        composeTestRule.mainClock.advanceTimeBy(5_000)
+        composeTestRule.waitForIdle()
+        assertEquals(
+            "A recomposition must not leave a second failure Snackbar behind",
+            0,
+            countNodesWithText(failureMessage)
+        )
+    }
+
     @Test
     fun theFailureSnackbarDisappearsOnItsOwnAfterItsShortDuration() {
         val failingContext = ServiceStartContext(composeTestRule.activity, failServiceStart = true)
@@ -431,6 +517,38 @@ class MainActivitySnackbarTest {
         composeTestRule
             .onNode(hasText(expectedString(R.string.player_error_playback_start_failed)))
             .assertIsDisplayed()
+    }
+
+    /**
+     * The pending failure request must be cancelled when the screen goes away, and the
+     * cancellation must not turn into an unhandled coroutine failure.
+     *
+     * The Snackbar request suspends until the Snackbar is dismissed or its action is
+     * performed. It belongs to the coroutine scope of the composition, so the destruction of
+     * the activity cancels it while it is still suspended. A cancellation that is reported as
+     * an ordinary failure would crash the app when the screen is left.
+     */
+    @Test
+    fun destroyingTheActivityWhileTheFailureSnackbarIsVisibleDoesNotFail() {
+        val failingContext = ServiceStartContext(composeTestRule.activity, failServiceStart = true)
+        setHomeContent(failingContext)
+
+        clickVideoCard()
+        composeTestRule
+            .onNode(hasText(expectedString(R.string.player_error_playback_start_failed)))
+            .assertIsDisplayed()
+
+        // The activity is destroyed while the failure request is still pending. The request
+        // belongs to the scope of the composition that goes away with it.
+        val failure = runCatching {
+            composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
+            ShadowLooper.idleMainLooper()
+        }.exceptionOrNull()
+
+        assertNull(
+            "Cancelling the pending failure request must not produce an unhandled failure",
+            failure
+        )
     }
 
     @Test
