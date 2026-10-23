@@ -201,5 +201,53 @@ class PlaybackServiceTest {
 
         controller.destroy()
     }
+
+    @Test
+    fun testMediaSessionPlayerCommandsIncludeVideoSurfaceAndMediaItem() {
+        // Verify contract of MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS in Media3 1.5.1
+        val defaultCommands = androidx.media3.session.MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+        org.junit.Assert.assertTrue(
+            "DEFAULT_PLAYER_COMMANDS must contain COMMAND_SET_VIDEO_SURFACE",
+            defaultCommands.contains(androidx.media3.common.Player.COMMAND_SET_VIDEO_SURFACE)
+        )
+        org.junit.Assert.assertTrue(
+            "DEFAULT_PLAYER_COMMANDS must contain COMMAND_GET_CURRENT_MEDIA_ITEM",
+            defaultCommands.contains(androidx.media3.common.Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
+        )
+
+        // Spin up PlaybackService and connect a MediaController
+        val serviceController = Robolectric.buildService(PlaybackService::class.java)
+        val service = serviceController.create().get()
+        try {
+            val sessionToken = PlaybackService.currentSessionToken
+            assertNotNull("PlaybackService must publish its session token", sessionToken)
+
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val controllerFuture = androidx.media3.session.MediaController.Builder(context, sessionToken!!)
+                .buildAsync()
+            val controller = controllerFuture.get(10, java.util.concurrent.TimeUnit.SECONDS)
+            try {
+                org.junit.Assert.assertTrue("Controller must be connected", controller.isConnected)
+                val availableCommands = controller.availableCommands
+
+                org.junit.Assert.assertTrue(
+                    "Connected controller must have COMMAND_SET_VIDEO_SURFACE",
+                    availableCommands.contains(androidx.media3.common.Player.COMMAND_SET_VIDEO_SURFACE)
+                )
+                org.junit.Assert.assertTrue(
+                    "Connected controller must have COMMAND_GET_CURRENT_MEDIA_ITEM",
+                    availableCommands.contains(androidx.media3.common.Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
+                )
+                org.junit.Assert.assertTrue(
+                    "Connected controller must have COMMAND_PLAY_PAUSE",
+                    availableCommands.contains(androidx.media3.common.Player.COMMAND_PLAY_PAUSE)
+                )
+            } finally {
+                androidx.media3.session.MediaController.releaseFuture(controllerFuture)
+            }
+        } finally {
+            serviceController.destroy()
+        }
+    }
 }
 

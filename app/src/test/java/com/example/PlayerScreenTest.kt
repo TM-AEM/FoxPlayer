@@ -176,4 +176,64 @@ class PlayerScreenTest {
         // Gesture detector layer must be mounted and ready for touch input
         composeTestRule.onNodeWithTag("player_gesture_detector").assertIsDisplayed()
     }
+
+    @Test
+    fun testPlayerScreenRecompositionPreservesSurfaceAndActivePlayer() {
+        val testVideo = VideoItem(
+            id = 606L,
+            uri = "content://media/external/video/media/606",
+            title = "Recomposition Video",
+            displayName = "recomp.mp4"
+        )
+        PlaybackService.startPlayback(service, testVideo)
+        val initialPlayer = PlaybackService.currentEngine?.player
+        assertNotNull(initialPlayer)
+
+        var triggerRecomposition by androidx.compose.runtime.mutableIntStateOf(0)
+
+        composeTestRule.setContent {
+            // Read trigger state to force recomposition of the host
+            val count = triggerRecomposition
+            androidx.compose.foundation.layout.Box {
+                PlayerScreen()
+                androidx.compose.material3.Text("Count: $count")
+            }
+        }
+
+        composeTestRule.onNodeWithTag("player_surface_view").assertIsDisplayed()
+
+        // Trigger multiple recompositions
+        triggerRecomposition = 1
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("player_surface_view").assertIsDisplayed()
+
+        triggerRecomposition = 2
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("player_surface_view").assertIsDisplayed()
+
+        // Verify player remains identical instance across recompositions
+        val engineAfter = PlaybackService.currentEngine
+        assertNotNull(engineAfter)
+        assertEquals("Player must remain the identical instance across recompositions", initialPlayer, engineAfter?.player)
+    }
+
+    @Test
+    fun testServiceDestructionCleansUpSessionAndEngine() {
+        val testVideo = VideoItem(
+            id = 707L,
+            uri = "content://media/external/video/media/707",
+            title = "Destruction Video",
+            displayName = "destroy.mp4"
+        )
+        PlaybackService.startPlayback(service, testVideo)
+        assertNotNull("Engine must be active", PlaybackService.currentEngine)
+        assertNotNull("Session token must be active", PlaybackService.currentSessionToken)
+
+        // Destroy service
+        serviceController.destroy()
+
+        // Verify state is completely cleared
+        org.junit.Assert.assertNull("currentEngine must be null after destroy", PlaybackService.currentEngine)
+        org.junit.Assert.assertNull("currentSessionToken must be null after destroy", PlaybackService.currentSessionToken)
+    }
 }
