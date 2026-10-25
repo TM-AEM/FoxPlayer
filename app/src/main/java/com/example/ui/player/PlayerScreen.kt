@@ -1,18 +1,14 @@
 package com.example.ui.player
 
 import android.app.Activity
-import android.view.SurfaceView
-import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -245,10 +240,11 @@ fun PlayerScreen(
         }
     }
 
-    // HUD Auto-Hide and Settings Dialog State
-    var isHudVisible by remember { mutableStateOf(true) }
+    // Settings Dialog State. HUD visibility and its auto-hide timer moved to
+    // PlayerHudLayer, the single owner of that state; the settings panel stays
+    // here because the back handler and the panel itself also need it.
+    val hudState = rememberPlayerHudLayerState()
     var isSettingsOpen by remember { mutableStateOf(false) }
-    var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     // Picture-in-Picture (PiP) State Tracking
     var isInPipMode by remember {
@@ -262,7 +258,7 @@ fun PlayerScreen(
                 isInPipMode = info.isInPictureInPictureMode
                 if (info.isInPictureInPictureMode) {
                     isSettingsOpen = false
-                    isHudVisible = false
+                    hudState.hide()
                 }
             }
             act.addOnPictureInPictureModeChangedListener(listener)
@@ -340,19 +336,11 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-hide timer: when HUD is visible and playing, auto-hide after 3.5 seconds of inactivity
-    LaunchedEffect(isHudVisible, playbackState.isPlaying, lastInteractionTime, isHorizontalSwiping, isSettingsOpen) {
-        if (isHudVisible && playbackState.isPlaying && !isHorizontalSwiping && !isSettingsOpen) {
-            delay(3500L)
-            isHudVisible = false
-        }
-    }
-
+    // The auto-hide timer itself lives in PlayerHudLayer, next to the HUD it
+    // hides. This forwards interactions to that single owner, so there is
+    // exactly one timer and one visibility state for the HUD.
     fun notifyUserInteraction() {
-        lastInteractionTime = System.currentTimeMillis()
-        if (!isHudVisible && !isSettingsOpen) {
-            isHudVisible = true
-        }
+        hudState.notifyInteraction(isSettingsOpen)
     }
 
     // Handle system back gesture/button: dismiss settings panel if open, otherwise exit player screen
@@ -437,7 +425,7 @@ fun PlayerScreen(
         PipHelper.updateAutoEnterPip(activity, videoAspectRatio, playbackState.isPlaying)
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .clipToBounds()
@@ -445,83 +433,23 @@ fun PlayerScreen(
             .testTag("player_screen_root"),
         contentAlignment = Alignment.Center
     ) {
-        val containerWidth = maxWidth
-        val containerHeight = maxHeight
-        val containerAspect = if (containerHeight.value > 0) {
-            containerWidth.value / containerHeight.value
-        } else {
-            16f / 9f
-        }
-
-        // Calculate surface dimensions based on selected ResizeMode:
-        // - FIT: letterbox/pillarbox preserving aspect ratio
-        // - FILL: stretches completely to container dimensions
-        // - ZOOM: crops/zooms to fill entire container preserving aspect ratio without black bars
-        val (surfaceWidth, surfaceHeight) = remember(
-            containerAspect,
-            videoAspectRatio,
-            containerWidth,
-            containerHeight,
-            resizeMode,
-            isInPipMode
-        ) {
-            if (isInPipMode) {
-                Pair(containerWidth, containerHeight)
-            } else {
-                when (resizeMode) {
-                    ResizeMode.FIT -> {
-                        if (containerAspect > videoAspectRatio) {
-                            // Wider container (e.g. landscape): pillarbox on sides
-                            Pair(containerHeight * videoAspectRatio, containerHeight)
-                        } else {
-                            // Taller container (e.g. portrait): letterbox on top/bottom
-                            Pair(containerWidth, containerWidth / videoAspectRatio)
-                        }
-                    }
-                    ResizeMode.FILL -> {
-                        Pair(containerWidth, containerHeight)
-                    }
-                    ResizeMode.ZOOM -> {
-                        if (containerAspect > videoAspectRatio) {
-                            // Container wider: scale by width so height overflows container
-                            Pair(containerWidth, containerWidth / videoAspectRatio)
-                        } else {
-                            // Container taller: scale by height so width overflows container
-                            Pair(containerHeight * videoAspectRatio, containerHeight)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Native SurfaceView composition with hardware surface pipeline
-        AndroidView(
-            factory = { ctx ->
-                SurfaceView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                }
-            },
-            update = { surfaceView ->
-                activePlayer?.setVideoSurfaceView(surfaceView)
-            },
-            onRelease = { surfaceView ->
-                activePlayer?.clearVideoSurfaceView(surfaceView)
-            },
-            modifier = Modifier
-                .size(surfaceWidth, surfaceHeight)
-                .align(Alignment.Center)
-                .testTag("player_surface_view")
+        // Native SurfaceView composition with hardware surface pipeline. The
+        // component owns the surface lifecycle: it attaches the surface to the
+        // active player, re-attaches it when the active player is replaced, and
+        // clears it from the player that is active when the screen exits.
+        PlayerSurface(
+            activePlayer = activePlayer,
+            videoAspectRatio = videoAspectRatio,
+            resizeMode = resizeMode,
+            isInPipMode = isInPipMode
         )
 
         // Checkpoint 8: Interactive Player Gesture Detector Layer (disabled in PiP mode)
         if (!isInPipMode) {
             PlayerGestureDetector(
                 onSingleTap = {
-                    if (isHudVisible) {
-                        isHudVisible = false
+                    if (hudState.isVisible) {
+                        hudState.hide()
                     } else {
                         notifyUserInteraction()
                     }
@@ -659,9 +587,14 @@ fun PlayerScreen(
             )
         }
 
-        // HUD Controls Layer (Top Bar, Play/Pause, Timeline) - hidden in PiP mode
-        PlayerHud(
-            isVisible = !isInPipMode && isHudVisible && !isSettingsOpen,
+        // HUD Controls Layer (Top Bar, Play/Pause, Timeline) - hidden in PiP mode.
+        // Rendered by PlayerHudLayer, which owns the HUD visibility state and
+        // the single auto-hide timer.
+        PlayerHudLayer(
+            state = hudState,
+            settingsOpen = isSettingsOpen,
+            inPipMode = isInPipMode,
+            horizontalSwiping = isHorizontalSwiping,
             title = videoTitle,
             isPlaying = playbackState.isPlaying,
             currentPositionMs = playbackState.currentPositionMs,
@@ -688,9 +621,6 @@ fun PlayerScreen(
                 targetPlayer?.seekTo(clampedPosition)
             },
             onBack = onBack,
-            onUserInteraction = {
-                notifyUserInteraction()
-            },
             onSettingsClick = {
                 isSettingsOpen = true
                 notifyUserInteraction()
@@ -698,7 +628,7 @@ fun PlayerScreen(
             onPipClick = if (PipHelper.isPipSupported(context)) {
                 {
                     isSettingsOpen = false
-                    isHudVisible = false
+                    hudState.hide()
                     PipHelper.enterPip(activity, videoAspectRatio)
                 }
             } else null

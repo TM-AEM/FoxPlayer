@@ -62,4 +62,37 @@ class PipHelperTest {
         // Either true or false, it must never throw an uncaught exception
         PipHelper.disableAutoEnterPip(activity)
     }
+
+    @Test
+    @Config(sdk = [30])
+    fun testAutoEnterPipIsNotAppliedBeforeAndroid12() {
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+
+        assertFalse(
+            "Auto-enter must stay unavailable on API 30 and lower",
+            PipHelper.updateAutoEnterPip(activity, 1.77f, isPlaying = true)
+        )
+        // The disable path must also be a safe no-op on these versions.
+        PipHelper.disableAutoEnterPip(activity)
+    }
+
+    @Test
+    @Config(sdk = [25])
+    fun testPipIsUnavailableBeforeOreo() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        shadowOf(context.packageManager).setSystemFeature(
+            PackageManager.FEATURE_PICTURE_IN_PICTURE,
+            true
+        )
+        assertFalse(
+            "PiP requires API 26 even when the device advertises the feature",
+            PipHelper.isPipSupported(context)
+        )
+
+        val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+        assertFalse(
+            "Entering PiP must be rejected before API 26",
+            PipHelper.enterPip(activity, 1.77f)
+        )
+    }
 }
